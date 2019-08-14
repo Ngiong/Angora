@@ -9,7 +9,8 @@ pub struct ChartStats {
     init_time: TimeIns,
     track_time: TimeDuration,
     density: Average,
-
+    subject: String,
+    outputdir : String,
     num_rounds: Counter,
     max_rounds: Counter,
     num_exec: Counter,
@@ -21,18 +22,28 @@ pub struct ChartStats {
     num_inputs: Counter,
     num_hangs: Counter,
     num_crashes: Counter,
+    
+    num_fuzzed: u32,
+    queuelen: usize,
 
     fuzz: FuzzStats,
     search: SearchStats,
     state: StateStats,
+
+    func: bool,
 }
 
 impl ChartStats {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(subject : &str , outputdir : &str, func : bool) -> Self {
+        Self{
+          subject : subject.to_string(),
+          outputdir : outputdir.to_string(),
+          func : func,
+          ..Default::default()
+        }
     }
 
-    pub fn sync_from_local(&mut self, local: &mut LocalStats) {
+    pub fn sync_from_local(&mut self, local: &mut LocalStats, num_fuzzed : u32, queuelen: usize) {
         self.track_time += local.track_time;
         self.num_rounds.count();
 
@@ -45,6 +56,8 @@ impl ChartStats {
 
         st.num_exec += local.num_exec;
         self.num_exec += local.num_exec;
+        self.num_fuzzed = num_fuzzed;
+        self.queuelen = queuelen;
         // if has new
         st.num_inputs += local.num_inputs;
         self.num_inputs += local.num_inputs;
@@ -106,12 +119,14 @@ impl ChartStats {
 
     pub fn mini_log(&self) -> String {
         format!(
-            "{}, {}, {}, {}, {}",
+            "{}, {}, {}, {}, {}, {}, {}",
             self.init_time.0.elapsed().as_secs(),
             self.density.0,
             self.num_inputs.0,
             self.num_hangs.0,
-            self.num_crashes.0
+            self.num_crashes.0,
+            self.avg_exec_time,
+            self.state.mini_state_log()
         )
     }
 
@@ -142,12 +157,15 @@ impl fmt::Display for ChartStats {
             f,
             r#"
 {}
+   SUBJECT : {}, OUTDIR : {}
+   Function heuristic : {}
 {}
-    TIMING |     RUN: {},   TRACK: {}
-  COVERAGE |    EDGE: {},   DENSITY: {}%
-    EXECS  |   TOTAL: {},     ROUND: {},     MAX_R: {}
-    SPEED  |  PERIOD: {:6}r/s    TIME: {}us, 
-    FOUND  |    PATH: {},     HANGS: {},   CRASHES: {}
+    TIMING |      RUN: {},   TRACK: {}
+  COVERAGE |     EDGE: {},   DENSITY: {}%
+    EXECS  |    TOTAL: {},     ROUND: {},     MAX_R: {}
+    SPEED  |   PERIOD: {:6}r/s    TIME: {}us, 
+    FOUND  |     PATH: {},     HANGS: {},   CRASHES: {}
+    QUEUE  | #_fuzzed: {},      SIZE: {}
 {}
 {}
 {}
@@ -157,6 +175,7 @@ impl fmt::Display for ChartStats {
 
 "#,
             get_bunny_logo().bold(),
+            self.subject.bold(), self.outputdir.bold(),self.func,
             " -- OVERVIEW -- ".blue().bold(),
             self.init_time,
             self.track_time,
@@ -170,6 +189,7 @@ impl fmt::Display for ChartStats {
             self.num_inputs,
             self.num_hangs,
             self.num_crashes,
+            self.num_fuzzed, self.queuelen,
             " -- FUZZ -- ".blue().bold(),
             self.fuzz,
             " -- SEARCH -- ".blue().bold(),

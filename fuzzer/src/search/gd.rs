@@ -77,9 +77,12 @@ impl<'a> GdSearch<'a> {
                 break;
             }
 
+            //change grad value to head lower value
             self.cal_gradient(&input, f0, &mut grad);
 
             let mut g_i = 0;
+            //calculated gradient is 0, can't move!!
+            //repick initial point, cal gradient again for MAX 8 times.
             while grad.max_val() == 0 {
                 if self.handler.is_stopped_or_skip() || g_i > config::MAX_NUM_MINIMAL_OPTIMA_ROUND {
                     break;
@@ -243,6 +246,7 @@ impl<'a> GdSearch<'a> {
             if self.handler.is_stopped_or_skip() {
                 break;
             }
+            //try changing ith value of grad by one, see result.
             let (s, l, f) = self.partial_derivative(input, i, f0);
             if f > max {
                 max = f;

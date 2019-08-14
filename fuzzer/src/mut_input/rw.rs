@@ -16,9 +16,10 @@ pub fn set_bytes_by_offsets(offsets: &Vec<TagSeg>, bytes: &Vec<u8>, buf: &mut Ve
     let mut cmp_off = (0, 0);
     for off in offsets {
         if off.begin < off.end {
+            let end = if off.end > buf.len() as u32 { buf.len() as u32} else {off.end};
             cmp_off.0 = cmp_off.1;
-            cmp_off.1 = cmp_off.0 + (off.end - off.begin) as usize;
-            let scope = &mut buf[off.begin as usize..off.end as usize];
+            cmp_off.1 = cmp_off.0 + (end - off.begin) as usize;
+            let scope = &mut buf[off.begin as usize..end as usize];
             scope.clone_from_slice(&bytes[cmp_off.0..cmp_off.1]);
         }
     }

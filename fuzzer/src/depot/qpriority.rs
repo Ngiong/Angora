@@ -6,7 +6,7 @@ const AFL_INIT_PRIORITY: u16 = 0;
 const DONE_PRIORITY: u16 = std::u16::MAX;
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
-pub struct QPriority(u16);
+pub struct QPriority(pub u16);
 impl QPriority {
     pub fn inc(&self, op: u32) -> Self {
         if op == defs::COND_AFL_OP {

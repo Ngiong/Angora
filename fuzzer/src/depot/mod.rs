@@ -1,8 +1,8 @@
 mod depot;
 mod depot_dir;
 mod dump;
-mod file;
-mod qpriority;
+pub mod file;
+pub mod qpriority;
 mod sync;
 
 pub use self::{depot::Depot, file::*, sync::*};

@@ -9,7 +9,7 @@ pub struct CondStmtBase {
     pub order: u32,
     pub belong: u32,
 
-    pub condition: u32,
+    pub condition: u32, // 0 false, 1 true, 2 done
     pub level: u32,
     pub op: u32,
     pub size: u32,

@@ -33,6 +33,8 @@ pub struct Executor {
     pub has_new_path: bool,
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
+    pub num_fuzzed : u32,
+    pub func_map : HashMap<String, Vec<(usize, bool)>>,
 }
 
 impl Executor {
@@ -41,10 +43,13 @@ impl Executor {
         global_branches: Arc<branches::GlobalBranches>,
         depot: Arc<depot::Depot>,
         global_stats: Arc<RwLock<stats::ChartStats>>,
+        func_map : HashMap<String, Vec<(usize, bool)>>,
     ) -> Self {
         // ** Share Memory **
         let branches = branches::Branches::new(global_branches);
         let t_conds = cond_stmt::ShmConds::new();
+
+        //println!("t_conds : new SHM, id : {}, ptr : {}", t_conds.get_id(), t_conds.get_ptr());
 
         // ** Envs **
         let mut envs = HashMap::new();
@@ -95,6 +100,8 @@ impl Executor {
             has_new_path: false,
             global_stats,
             local_stats: Default::default(),
+            num_fuzzed : 0,
+            func_map : func_map,
         }
     }
 
@@ -175,13 +182,15 @@ impl Executor {
         cond: &mut cond_stmt::CondStmt,
     ) -> (StatusType, u64) {
         self.run_init();
-        self.t_conds.set(cond);
+        self.t_conds.set(cond); //cond_stmt::ShmConds
         let mut status = self.run_inner(buf);
 
         let output = self.t_conds.get_cond_output();
         let mut explored = false;
         let mut skip = false;
+        //We don't have to target COND if it has been explored
         skip |= self.check_explored(cond, status, output, &mut explored);
+        //We don't have to target COND if we can't change result
         skip |= self.check_invariable(output, cond);
         self.check_consistent(output, cond);
 
@@ -223,7 +232,19 @@ impl Executor {
 
     fn do_if_has_new(&mut self, buf: &Vec<u8>, status: StatusType, _explored: bool, cmpid: u32) {
         // new edge: one byte in bitmap
-        let (has_new_path, has_new_edge, edge_num) = self.branches.has_new(status);
+        let (has_new_path, has_new_edge, edge_num, new_blocks) = self.branches.has_new(status);
+
+        // measure function block covearge
+        // Vec<usize>
+        if new_blocks.len() > 0 {
+          for (_k, v) in self.func_map.iter_mut() {
+            for v2 in v.iter_mut() {
+              for &bb in &new_blocks {
+                if bb == v2.0 {  *v2 = (bb, true); break;}
+              }
+            }
+          }
+        }
 
         if has_new_path {
             self.has_new_path = true;
@@ -276,7 +297,7 @@ impl Executor {
 
     fn run_init(&mut self) {
         self.has_new_path = false;
-        self.local_stats.num_exec.count();
+        self.local_stats.num_exec.count(); //record # of execution
     }
 
     fn check_timeout(&mut self, status: StatusType, cond: &mut cond_stmt::CondStmt) -> StatusType {
@@ -303,6 +324,7 @@ impl Executor {
     fn run_inner(&mut self, buf: &Vec<u8>) -> StatusType {
         self.write_test(buf);
 
+        //clear a SHM area which recrods each execution ___.
         self.branches.clear_trace();
 
         compiler_fence(Ordering::SeqCst);
@@ -435,10 +457,12 @@ impl Executor {
     }
 
     pub fn update_log(&mut self) {
+        let q = match self.depot.queue.lock(){ Ok(guard)=> guard, Err(poisoned) => poisoned.into_inner()};
+        let len = q.len();
         self.global_stats
             .write()
             .unwrap()
-            .sync_from_local(&mut self.local_stats);
+            .sync_from_local(&mut self.local_stats, self.num_fuzzed, len);
 
         self.t_conds.clear();
         self.tmout_cnt = 0;

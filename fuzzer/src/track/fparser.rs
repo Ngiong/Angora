@@ -1,4 +1,5 @@
 use super::filter;
+use std::io::Write;
 use super::load_pin_data::get_log_data_pin;
 use crate::{
     cond_stmt::{CondState, CondStmt},
@@ -9,7 +10,7 @@ use runtime::get_log_data;
 use std::{collections::HashMap, io, path::Path};
 
 pub fn read_and_parse(
-    out_f: &Path,
+    out_f: &Path, //tt executable output
     is_pin_mode: bool,
     enable_exploitation: bool,
 ) -> io::Result<Vec<CondStmt>> {
@@ -17,7 +18,7 @@ pub fn read_and_parse(
         if is_pin_mode {
             get_log_data_pin(out_f)?
         } else {
-            get_log_data(out_f)?
+            get_log_data(out_f)? 
         }
     };
 
@@ -51,9 +52,10 @@ fn get_offsets_and_variables(
     let offsets1 = m.get(&cond.base.lb1).unwrap_or(&empty_offsets);
     let offsets2 = m.get(&cond.base.lb2).unwrap_or(&empty_offsets);
     if offsets2.len() == 0 || (offsets1.len() > 0 && offsets1.len() <= offsets2.len()) {
+        //pick shorter one?
         cond.offsets = offsets1.clone();
         if cond.base.lb2 > 0 && cond.base.lb1 != cond.base.lb2 {
-            cond.offsets_opt = offsets2.clone();
+            cond.offsets_opt = offsets2.clone();  //save it for later..
         }
         cond.variables = if let Some(args) = magic_bytes {
             [&args.1[..], &args.0[..]].concat()
@@ -75,8 +77,8 @@ fn get_offsets_and_variables(
 }
 
 pub fn load_track_data(
-    out_f: &Path,
-    id: u32,
+    out_f: &Path,  //track_executable output file
+    id: u32,       
     speed: u32,
     is_pin_mode: bool,
     enable_exploitation: bool,
@@ -88,6 +90,43 @@ pub fn load_track_data(
             vec![]
         }
     };
+
+    {
+    //cheong
+    let cond_out_path = &out_f.parent().unwrap().parent().unwrap().join("conds.txt");
+    let exists = &cond_out_path.exists();
+    let file = std::fs::OpenOptions::new().read(true).write(true).create(true).open(cond_out_path).unwrap();
+    let mut writer = std::io::BufWriter::new(&file);
+ 
+    if !exists { match writeln!(&mut writer,
+                                "cmpid,input,# of offsets,offsets len,op,context,args,condition,lb1,lb2"){
+                 Ok(_) => {()},
+                 Err(_) => {println!("debug, can't write");}}}
+ 
+    for cond in &cond_list{
+           // println!("{:?}", cond.base);
+            let op = cond.base.op;
+            if (op & defs::COND_BASIC_MASK) == defs::COND_SW_OP {
+                // println!("SW: cmpid {}, context {}, order{}, condition {}",
+                // cond.base.cmpid, cond.base.context, cond.base.order, cond.base.condition);
+            } else {
+                let mut offlen = 0;
+                for off in &cond.offsets{
+                   offlen = offlen + off.end - off.begin;
+                }
+                match writeln!(&mut writer,
+                    "{},{},{},{},{},{},({}, {}),{},{},{}",
+                    cond.base.cmpid, cond.base.belong, cond.offsets.len(),offlen,
+                    cond.base.op,
+                    cond.base.context,
+                    cond.base.arg1,
+                    cond.base.arg2,
+                    cond.base.condition, cond.base.lb1, cond.base.lb2
+                ) { Ok(_) => {()}, Err(_) => {println!("can't write");}
+                }
+            }
+    }
+    }
 
     for cond in cond_list.iter_mut() {
         cond.base.belong = id;

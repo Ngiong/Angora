@@ -32,6 +32,8 @@ pub struct StateStats {
     one_byte: PendingCounter,
     unsolvable: PendingCounter,
     timeout: PendingCounter,
+    func : PendingCounter,
+    func_rel : PendingCounter,
 }
 
 impl StateStats {
@@ -56,8 +58,22 @@ impl StateStats {
             CondState::Timeout => {
                 self.timeout.count(is_done);
             },
+            CondState::OffsetFunc => {
+               self.func.count(is_done);
+            },
+            CondState::OffsetRelFunc => {
+               self.func_rel.count(is_done);
+            }
         }
     }
+  pub fn mini_state_log(&self) -> String {
+   let res :String = format!( "{}d/{}p, {}d/{}p, {}d/{}p, {}d/{}p, {}d/{}p, {}d/{}p, {}d/{}p, {}d/{}p",
+             self.normal.done.0, self.normal.pending.0, self.normal_end.done.0, self.normal_end.pending.0,
+              self.one_byte.done.0, self.one_byte.pending.0, self.det.done.0, self.det.pending.0,
+              self.timeout.done.0, self.timeout.pending.0, self.unsolvable.done.0, self.unsolvable.pending.0,
+              self.func.done.0, self.func.pending.0, self.func_rel.done.0, self.func_rel.pending.0);
+   res
+  }
 }
 
 impl fmt::Display for StateStats {
@@ -65,8 +81,9 @@ impl fmt::Display for StateStats {
         write!(
             f,
             r#"           |    NORMAL: {},   NORMAL_END: {},   ONE_BYTE: {}
-           |       DET: {},    TIMEOUT: {},     UNSOLVABLE: {}"#,
-            self.normal, self.normal_end, self.one_byte, self.det, self.timeout, self.unsolvable,
+           |       DET: {},    TIMEOUT: {},     UNSOLVABLE: {}
+           |     FUNC : {},  FUNC_REL : {}"#,
+            self.normal, self.normal_end, self.one_byte, self.det, self.timeout, self.unsolvable, self.func, self.func_rel
         )
     }
 }

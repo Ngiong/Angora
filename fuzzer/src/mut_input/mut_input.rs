@@ -40,6 +40,7 @@ impl MutInput {
     pub fn from(offsets: &Vec<TagSeg>, input: &Vec<u8>) -> Self {
         let len = input.len();
         let mut mut_input = MutInput::new();
+        assert!( offsets.len() != 0);
         for off in offsets {
             let begin = off.begin as usize;
             let end = off.end as usize;
@@ -63,7 +64,6 @@ impl MutInput {
                 }
             }
         }
-
         mut_input
     }
 

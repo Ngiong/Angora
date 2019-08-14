@@ -12,7 +12,7 @@ pub const PREFER_FAST_COND: bool = true;
 pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
-pub const MAP_SIZE_POW2: usize = 20;
+pub const MAP_SIZE_POW2: usize = 21;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -43,3 +43,13 @@ pub const MUTATE_ARITH_MAX: u32 = 30;
 pub const RANDOM_LEN_NUM: usize = 30;
 pub const MAX_HAVOC_FLIP_TIMES: usize = 45; // for all bytes
 pub const MAX_SPLICE_TIMES: usize = 45;
+
+
+//Cheong
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
+pub const FUNC_CHOOSE_LOOP_MAX : u32 = 40;
+pub const FUNC_TARGET_NUMBER_OF_COND : u32 = 20;
+pub const FUNC_TARGET_PRIORITY_THREASHOLD : u16 = 10;
+pub const FUNC_REL_NUM : usize = 0;
+pub const FUNC_REL_RATIO : f64 = 0.3;
+pub const FUNC_REL_THRESHOLD : f64 = 0.8;

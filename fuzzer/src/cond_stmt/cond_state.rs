@@ -1,4 +1,8 @@
 use crate::{cond_stmt::CondStmt, mut_input::offsets::*};
+use std::fmt;
+use std::sync::Arc;
+use std::collections::HashMap;
+use crate::depot::Depot;
 use angora_common::{config, defs};
 use std;
 
@@ -8,6 +12,8 @@ pub enum CondState {
     OffsetOpt,
     OffsetAll,
     OffsetAllEnd,
+    OffsetFunc,
+    OffsetRelFunc,
 
     OneByte,
     Unsolvable,
@@ -62,19 +68,38 @@ impl CondState {
     }
 }
 
+impl fmt::Display for CondState {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
+    match self {
+      CondState::Offset => { write!(f, "Offset")},
+      CondState::OffsetOpt => {write!(f, "OffsetOpt")},
+      CondState::OffsetAll => {write!(f, "OffsetAll")},
+      CondState::OffsetAllEnd => {write!(f, "OffsetAllEnd")},
+      CondState::OffsetFunc => {write!(f, "OffsetFunc")},
+      CondState::OffsetRelFunc => {write!(f, "OffsetRelFunc")}, 
+      CondState::OneByte => {write!(f, "OneByte")},
+      CondState::Unsolvable => {write!(f, "Unsolvable")},
+      CondState::Deterministic => {write!(f, "Det")},
+      CondState::Timeout => {write!(f, "Timeout")},
+    }
+  }
+}
+
 pub trait NextState {
-    fn next_state(&mut self);
+    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>, func_rel_map : &HashMap<String, HashMap<String, u32>>);
 
     fn to_offsets_opt(&mut self);
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
     fn to_det(&mut self);
+    fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>);
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>, func_rel_map : &HashMap<String, HashMap<String, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
 }
 
 impl NextState for CondStmt {
-    fn next_state(&mut self) {
+    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>, func_rel_map : &HashMap<String, HashMap<String, u32>>) {
         match self.state {
             CondState::Offset => {
                 if self.offsets_opt.len() > 0 {
@@ -87,7 +112,8 @@ impl NextState for CondStmt {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
                 } else {
-                    self.to_unsolvable();
+                    self.to_offsets_func(depot, func_cmp_map);
+                   //self.to_unsolvable();
                 }
             },
             CondState::OffsetOpt => {
@@ -97,6 +123,12 @@ impl NextState for CondStmt {
                 self.to_det();
             },
             CondState::Deterministic => {
+                self.to_offsets_func(depot, func_cmp_map);
+            },
+            CondState::OffsetFunc => {
+                self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
+            },
+            CondState::OffsetRelFunc => {
                 self.to_offsets_all_end();
             },
             _ => {},
@@ -120,6 +152,64 @@ impl NextState for CondStmt {
     fn to_offsets_all_end(&mut self) {
         debug!("to_all_end");
         self.state = CondState::OffsetAllEnd;
+    }
+    
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
+        self.state = CondState::OffsetFunc;
+        if func_cmp_map.len() == 0 {return ; }
+        let mut cmp_list : Vec<u32> = Vec::new();
+        //get function which contain target cmp
+        for (_k, v) in func_cmp_map {
+          if v.contains(&self.base.cmpid) { cmp_list = v.clone(); break; }
+        }
+        let q = match depot.queue.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}};
+        let iter = q.iter();
+        for (i, _p) in iter {
+          if self.base.belong != i.base.belong {continue;}
+          if cmp_list.contains(&i.base.cmpid) {
+            self.offsets = merge_offsets(&self.offsets, &i.offsets);
+            self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+          }
+        }
+    }
+    
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                                      func_rel_map : &HashMap<String, HashMap<String, u32>>){
+        self.state = CondState::OffsetRelFunc;
+        if func_cmp_map.len() == 0 {return ; }
+        let mut cmp_list : Vec<u32> = Vec::new();
+        let mut cmp_func : String = String::new();
+        //get func which contains the cmp.
+        for (k, v) in func_cmp_map {
+          if v.contains(&self.base.cmpid) {cmp_func = k.clone(); break; }
+        }
+        //get cmp list of rel func
+        let rels : &HashMap<String, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
+        let mut rel_list : Vec<(String, u32)> = Vec::new();
+        let mut target_runs = 0;
+        for (k, v) in rels{
+           rel_list.push((k.clone(), *v));
+           if *k == cmp_func { target_runs = *v;}
+        }
+        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
+        for (rel_func, _rel) in rel_list {
+          let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
+          cmp_list.append(&mut rel_cmp_list);
+        }
+        let q = match depot.queue.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
+        };
+        let iter = q.iter();
+        for (i, _p) in iter{
+          if self.base.belong != i.base.belong {continue;}
+          if cmp_list.contains(&i.base.cmpid) {
+            self.offsets = merge_offsets(&self.offsets, &i.offsets);
+            self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+          }
+        }
     }
 
     fn to_unsolvable(&mut self) {

@@ -63,6 +63,7 @@ public:
   u32 CidCounter;
   unsigned long int RandSeed = 1;
   bool is_bc;
+  unsigned int inst_ratio = 100;
 
   // Const Variables
   DenseSet<u32> UniqCidSet;
@@ -117,6 +118,7 @@ public:
   bool runOnModule(Module &M) override;
   u32 getInstructionId(Instruction *Inst);
   u32 getRandomBasicBlockId();
+  bool skipBasicBlock();
   u32 getRandomNum();
   void setRandomNumSeed(u32 seed);
   u32 getRandomContextId();
@@ -125,17 +127,17 @@ public:
   void setInsNonSan(Instruction *v);
   Value *castArgType(IRBuilder<> &IRB, Value *V);
   void initVariables(Module &M);
-  void countEdge(Module &M, BasicBlock &BB);
-  void visitCallInst(Instruction *Inst);
-  void visitInvokeInst(Instruction *Inst);
-  void visitCompareFunc(Instruction *Inst);
-  void visitBranchInst(Instruction *Inst);
-  void visitCmpInst(Instruction *Inst);
+  void countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_list);
+  void visitCallInst(Instruction *Inst, std::vector<u32> &cmp_list);
+  void visitInvokeInst(Instruction *Inst, std::vector<u32> &cmp_list);
+  void visitCompareFunc(Instruction *Inst, std::vector<u32> &cmp_list);
+  void visitBranchInst(Instruction *Inst, std::vector<u32> &cmp_list);
+  void visitCmpInst(Instruction *Inst, std::vector<u32> & cmp_list);
   void processCmp(Instruction *Cond, Constant *Cid, Instruction *InsertPoint);
   void processBoolCmp(Value *Cond, Constant *Cid, Instruction *InsertPoint);
-  void visitSwitchInst(Module &M, Instruction *Inst);
-  void visitExploitation(Instruction *Inst);
-  void processCall(Instruction *Inst);
+  void visitSwitchInst(Module &M, Instruction *Inst, std::vector<u32> & cmp_list);
+  void visitExploitation(Instruction *Inst, std::vector<u32> & cmp_list);
+  void processCall(Instruction *Inst, std::vector<u32> &cmp_list);
   void addFnWrap(Function &F);
 };
 
@@ -145,6 +147,7 @@ char AngoraLLVMPass::ID = 0;
 
 u32 AngoraLLVMPass::getRandomBasicBlockId() { return random() % MAP_SIZE; }
 
+bool AngoraLLVMPass::skipBasicBlock() { return (random() % 100) >= inst_ratio; }
 // http://pubs.opengroup.org/onlinepubs/009695399/functions/rand.html
 u32 AngoraLLVMPass::getRandomNum() {
   RandSeed = RandSeed * 1103515245 + 12345;
@@ -216,11 +219,18 @@ void AngoraLLVMPass::initVariables(Module &M) {
   if (ModName.size() == 0)
     FATAL("No ModName!\n");
   ModId = hashName(ModName);
-  errs() << "ModName: " << ModName << " -- " << ModId << "\n";
+  //errs() << "ModName: " << ModName << " -- " << ModId << "\n";
   is_bc = 0 == ModName.compare(ModName.length() - 3, 3, ".bc");
   if (is_bc) {
     errs() << "Input is LLVM bitcode\n";
   }
+
+  char* inst_ratio_str = getenv("ANGORA_INST_RATIO");
+  if (inst_ratio_str){
+     if (sscanf(inst_ratio_str, "%u", &inst_ratio) != 1 || !inst_ratio ||
+        inst_ratio > 100) FATAL("Bad value of ANGORA_INST_RATIO (must be between 1 and 100)");
+  }
+  //errs() << "inst_ratio: " << inst_ratio << "\n";
 
   // set seed
   srandom(ModId);
@@ -251,6 +261,7 @@ void AngoraLLVMPass::initVariables(Module &M) {
       ConstantInt::get(Int32Ty, 0), "__angora_call_site", 0, 
       GlobalVariable::GeneralDynamicTLSModel, 0, false);
 
+  //Add definition of insturmentation functions as global
   if (FastMode) {
     AngoraMapPtr = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                                       GlobalValue::ExternalLinkage, 0,
@@ -339,8 +350,8 @@ void AngoraLLVMPass::initVariables(Module &M) {
   char* custom_fn_ctx = getenv(CUSTOM_FN_CTX);
   if (custom_fn_ctx) {
     num_fn_ctx = atoi(custom_fn_ctx);
-    if (num_fn_ctx < 0 || num_fn_ctx > 32) {
-      errs() << "custom context should be: >= 0 && <=32 \n"; 
+    if (num_fn_ctx < 0 || num_fn_ctx >= 32) {
+      errs() << "custom context should be: >= 0 && < 32 \n"; 
       exit(1);
     }
   }
@@ -364,13 +375,14 @@ void AngoraLLVMPass::initVariables(Module &M) {
 
 // Coverage statistics: AFL's Branch count
 // Angora enable function-call context.
-void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB) {
-  if (!FastMode)
-    return;
-
+void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_list) {
   // LLVMContext &C = M.getContext();
+  if (!FastMode || skipBasicBlock()) return;
+ 
   unsigned int cur_loc = getRandomBasicBlockId();
+  bb_list.push_back(cur_loc);
   ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
+  ConstantInt *CurBLoc = ConstantInt::get(Int32Ty, cur_loc + MAP_SIZE);
 
   BasicBlock::iterator IP = BB.getFirstInsertionPt();
   IRBuilder<> IRB(&(*IP));
@@ -390,21 +402,54 @@ void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB) {
   Value *MapPtrIdx = IRB.CreateGEP(MapPtr, BrId);
   setValueNonSan(MapPtrIdx);
 
+  // get Map of block cov
+  Value *MapBPtrIdx = IRB.CreateGEP(MapPtr, CurBLoc);
+  setValueNonSan(MapBPtrIdx);
+
   // Increase 1 : IncRet <- Map[idx] + 1
   LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
   setInsNonSan(Counter);
+  LoadInst *BCounter = IRB.CreateLoad(MapBPtrIdx);
+  setInsNonSan(BCounter);
 
-  // Avoid overflow
+  // Avoid overflow  //deprecated
+  /*
   Value *CmpOF = IRB.CreateICmpNE(Counter, ConstantInt::get(Int8Ty, -1));
   setValueNonSan(CmpOF);
+  Value *BCmpOF = IRB.CreateICmpNE(BCounter, ConstantInt::get(Int8Ty, -1));
+  setValueNonSan(BCmpOF);
 
   Value *IncVal = IRB.CreateZExt(CmpOF, Int8Ty);
   setValueNonSan(IncVal);
+  Value *BIncVal = IRB.CreateZExt(BCmpOF, Int8Ty);
+  setValueNonSan(BIncVal);
+
   Value *IncRet = IRB.CreateAdd(Counter, IncVal);
   setValueNonSan(IncRet);
+  Value *BIncRet = IRB.CreateAdd(BCounter, BIncVal);
+  setValueNonSan(BIncRet);
+  */
+  
+  Value *IncRet = IRB.CreateAdd(Counter, ConstantInt::get(Int8Ty, 1));
+  setValueNonSan(IncRet);
+  Value *BIncRet = IRB.CreateAdd(BCounter, ConstantInt::get(Int8Ty, 1));
+  setValueNonSan(BIncRet);
+  Value *IsZero = IRB.CreateICmpEQ(IncRet, ConstantInt::get(Int8Ty, 0));
+  setValueNonSan(IsZero);
+  Value *BIsZero = IRB.CreateICmpEQ(BIncRet, ConstantInt::get(Int8Ty, 0));
+  setValueNonSan(BIsZero);
+  Value *IncVal = IRB.CreateZExt(IsZero, Int8Ty);
+  setValueNonSan(IncVal);
+  Value *BIncVal = IRB.CreateZExt(BIsZero, Int8Ty);
+  setValueNonSan(BIncVal);
+  IncRet = IRB.CreateAdd(IncRet, IncVal);
+  setValueNonSan(IncRet);
+  BIncRet = IRB.CreateAdd(BIncRet, BIncVal);
+  setValueNonSan(BIncRet);
 
   // Store Back Map[idx]
   IRB.CreateStore(IncRet, MapPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
+  IRB.CreateStore(BIncRet, MapBPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
 
   Value *NewPrevLoc = NULL;
   if (num_fn_ctx != 0) { // Call-based context
@@ -474,10 +519,10 @@ void AngoraLLVMPass::addFnWrap(Function &F) {
   }
 }
 
-void AngoraLLVMPass::processCall(Instruction *Inst) {
+void AngoraLLVMPass::processCall(Instruction *Inst, std::vector<u32> &cmp_list) {
   
-  visitCompareFunc(Inst);
-  visitExploitation(Inst);
+  visitCompareFunc(Inst, cmp_list);
+  visitExploitation(Inst, cmp_list);
 
   //  if (ABIList.isIn(*Callee, "uninstrumented"))
   //  return;
@@ -488,7 +533,7 @@ void AngoraLLVMPass::processCall(Instruction *Inst) {
   }
 }
 
-void AngoraLLVMPass::visitCallInst(Instruction *Inst) {
+void AngoraLLVMPass::visitCallInst(Instruction *Inst, std::vector<u32> &cmp_list) {
 
   CallInst *Caller = dyn_cast<CallInst>(Inst);
   Function *Callee = Caller->getCalledFunction();
@@ -505,10 +550,10 @@ void AngoraLLVMPass::visitCallInst(Instruction *Inst) {
     return;
   }
 
-  processCall(Inst);
+  processCall(Inst, cmp_list);
 };
 
-void AngoraLLVMPass::visitInvokeInst(Instruction *Inst) {
+void AngoraLLVMPass::visitInvokeInst(Instruction *Inst, std::vector<u32> &cmp_list) {
 
   InvokeInst *Caller = dyn_cast<InvokeInst>(Inst);
   Function *Callee = Caller->getCalledFunction();
@@ -518,16 +563,18 @@ void AngoraLLVMPass::visitInvokeInst(Instruction *Inst) {
     return;
   }
 
-  processCall(Inst);
+  processCall(Inst, cmp_list);
 }
 
-void AngoraLLVMPass::visitCompareFunc(Instruction *Inst) {
+void AngoraLLVMPass::visitCompareFunc(Instruction *Inst, std::vector<u32> &cmp_list) {
   // configuration file: custom/exploitation_list.txt  fun:xx=cmpfn
 
   if (!isa<CallInst>(Inst) || !ExploitList.isIn(*Inst, CompareFuncCat)) {
     return;
   }
-  ConstantInt *Cid = ConstantInt::get(Int32Ty, getInstructionId(Inst));
+  u32 iid = getInstructionId(Inst);
+  cmp_list.push_back(iid);
+  ConstantInt *Cid = ConstantInt::get(Int32Ty, iid);
 
   if (!TrackMode)
     return;
@@ -602,15 +649,18 @@ void AngoraLLVMPass::processCmp(Instruction *Cond, Constant *Cid,
   IRBuilder<> IRB(InsertPoint);
 
   if (FastMode) {
-    /*
+  /*
     OpArg[0] = castArgType(IRB, OpArg[0]);
     OpArg[1] = castArgType(IRB, OpArg[1]);
     Value *CondExt = IRB.CreateZExt(Cond, Int32Ty);
     setValueNonSan(CondExt);
+    LoadInst *CurCtx = IRB.CreateLoad(AngoraContext);
+    setInsNonSan(CurCtx);
     CallInst *ProxyCall =
-        IRB.CreateCall(TraceCmp, {CondExt, Cid, OpArg[0], OpArg[1]});
+        IRB.CreateCall(TraceCmp, {CondExt, Cid, CurCtx, OpArg[0], OpArg[1]});
     setInsNonSan(ProxyCall);
-        */
+    */
+    
     LoadInst *CurCid = IRB.CreateLoad(AngoraCondId);
     setInsNonSan(CurCid);
     Value *CmpEq = IRB.CreateICmpEQ(Cid, CurCid);
@@ -623,13 +673,14 @@ void AngoraLLVMPass::processCmp(Instruction *Cond, Constant *Cid,
     IRBuilder<> ThenB(BI);
     OpArg[0] = castArgType(ThenB, OpArg[0]);
     OpArg[1] = castArgType(ThenB, OpArg[1]);
-    Value *CondExt = ThenB.CreateZExt(Cond, Int32Ty);
+    Value * CondExt = ThenB.CreateZExt(Cond, Int32Ty);
     setValueNonSan(CondExt);
-    LoadInst *CurCtx = ThenB.CreateLoad(AngoraContext);
+    LoadInst * CurCtx = ThenB.CreateLoad(AngoraContext);
     setInsNonSan(CurCtx);
-    CallInst *ProxyCall =
+    CallInst * ProxyCall =
         ThenB.CreateCall(TraceCmp, {CondExt, Cid, CurCtx, OpArg[0], OpArg[1]});
     setInsNonSan(ProxyCall);
+   
   } else if (TrackMode) {
     Value *SizeArg = ConstantInt::get(Int32Ty, num_bytes);
     u32 predicate = Cmp->getPredicate();
@@ -694,29 +745,35 @@ void AngoraLLVMPass::processBoolCmp(Value *Cond, Constant *Cid,
   }
 }
 
-void AngoraLLVMPass::visitCmpInst(Instruction *Inst) {
+void AngoraLLVMPass::visitCmpInst(Instruction *Inst, std::vector<u32> &cmp_list) {
   Instruction *InsertPoint = Inst->getNextNode();
-  if (!InsertPoint || isa<ConstantInt>(Inst))
+  if (!InsertPoint || isa<ConstantInt>(Inst)){
+    errs() << "can't get cmp insert\n";
     return;
-  Constant *Cid = ConstantInt::get(Int32Ty, getInstructionId(Inst));
+  }
+  u32 iid = getInstructionId(Inst);
+  cmp_list.push_back(iid);
+  Constant *Cid = ConstantInt::get(Int32Ty, iid);
   processCmp(Inst, Cid, InsertPoint);
 }
 
-void AngoraLLVMPass::visitBranchInst(Instruction *Inst) {
+void AngoraLLVMPass::visitBranchInst(Instruction *Inst, std::vector<u32> &cmp_list) {
   BranchInst *Br = dyn_cast<BranchInst>(Inst);
   if (Br->isConditional()) {
     Value *Cond = Br->getCondition();
     if (Cond && Cond->getType()->isIntegerTy() && !isa<ConstantInt>(Cond)) {
       if (!isa<CmpInst>(Cond)) {
         // From  and, or, call, phi ....
-        Constant *Cid = ConstantInt::get(Int32Ty, getInstructionId(Inst));
+        u32 iid = getInstructionId(Inst);
+        Constant *Cid = ConstantInt::get(Int32Ty, iid);
+        cmp_list.push_back(iid);
         processBoolCmp(Cond, Cid, Inst);
       }
     }
   }
 }
 
-void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst) {
+void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst, std::vector<u32> &cmp_list) {
 
   SwitchInst *Sw = dyn_cast<SwitchInst>(Inst);
   Value *Cond = Sw->getCondition();
@@ -730,7 +787,9 @@ void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst) {
   if (num_bytes == 0 || num_bits % 8 > 0)
     return;
 
-  Constant *Cid = ConstantInt::get(Int32Ty, getInstructionId(Inst));
+  u32 iid = getInstructionId(Inst);
+  cmp_list.push_back(iid);
+  Constant *Cid = ConstantInt::get(Int32Ty, iid);
   IRBuilder<> IRB(Sw);
 
   if (FastMode) {
@@ -776,7 +835,7 @@ void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst) {
   }
 }
 
-void AngoraLLVMPass::visitExploitation(Instruction *Inst) {
+void AngoraLLVMPass::visitExploitation(Instruction *Inst, std::vector<u32> &cmp_list) {
   // For each instruction and called function.
   bool exploit_all = ExploitList.isIn(*Inst, ExploitCategoryAll);
   IRBuilder<> IRB(Inst);
@@ -801,7 +860,9 @@ void AngoraLLVMPass::visitExploitation(Instruction *Inst) {
       Type *ParamType = ParamVal->getType();
       if (ParamType->isIntegerTy() || ParamType->isPointerTy()) {
         if (!isa<ConstantInt>(ParamVal)) {
-          ConstantInt *Cid = ConstantInt::get(Int32Ty, getInstructionId(Inst));
+          u32 iid = getInstructionId(Inst);
+          cmp_list.push_back(iid);
+          ConstantInt *Cid = ConstantInt::get(Int32Ty, iid);
           int size = ParamVal->getType()->getScalarSizeInBits() / 8;
           if (ParamType->isPointerTy()) {
             size = 8;
@@ -825,11 +886,11 @@ void AngoraLLVMPass::visitExploitation(Instruction *Inst) {
 
 bool AngoraLLVMPass::runOnModule(Module &M) {
 
-  SAYF(cCYA "angora-llvm-pass\n");
+  //SAYF(cCYA "angora-llvm-pass\n");
   if (TrackMode) {
     OKF("Track Mode.");
   } else if (DFSanMode) {
-    OKF("DFSan Mode.");
+    //OKF("DFSan Mode.");
   } else {
     FastMode = true;
     OKF("Fast Mode.");
@@ -840,12 +901,23 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
   if (DFSanMode)
     return true;
 
+  std::ofstream func;
+  std::ofstream func2;
+  std::string sourceFileName = M.getSourceFileName();
+  if (sourceFileName.at(0) == '.' && sourceFileName.at(1) == '/') {
+    sourceFileName.erase(0,2);
+  }
+  if (FastMode){
+    func.open("FInfo-cmp-" + sourceFileName + ".txt", std::ofstream::out | std::ofstream::app);
+    func2.open("FInfo-bb-" + sourceFileName + ".txt", std::ofstream::out | std::ofstream::app);
+  }
   for (auto &F : M) {
-    if (F.isDeclaration())
+    if (F.isDeclaration() || F.getName().startswith(StringRef("asan.module")))
       continue;
 
     addFnWrap(F);
-
+    std::vector<u32> cmp_list;
+    std::vector<u32> bbid_list;
     std::vector<BasicBlock *> bb_list;
     for (auto bb = F.begin(); bb != F.end(); bb++)
       bb_list.push_back(&(*bb));
@@ -864,25 +936,42 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         if (Inst->getMetadata(NoSanMetaId))
           continue;
         if (Inst == &(*BB->getFirstInsertionPt())) {
-          countEdge(M, *BB);
+          countEdge(M, *BB, bbid_list); //execute only in fast mode
         }
         if (isa<CallInst>(Inst)) {
-          visitCallInst(Inst);
+          visitCallInst(Inst, cmp_list);
         } else if (isa<InvokeInst>(Inst)) {
-          visitInvokeInst(Inst);
+          visitInvokeInst(Inst, cmp_list);
         } else if (isa<BranchInst>(Inst)) {
-          visitBranchInst(Inst);
+          visitBranchInst(Inst, cmp_list);
         } else if (isa<SwitchInst>(Inst)) {
-          visitSwitchInst(M, Inst);
+          visitSwitchInst(M, Inst, cmp_list);
         } else if (isa<CmpInst>(Inst)) {
-          visitCmpInst(Inst);
+          visitCmpInst(Inst, cmp_list);
         } else {
-          visitExploitation(Inst);
+          visitExploitation(Inst, cmp_list);
         }
       }
     }
+    if ((cmp_list.size() > 0) && FastMode){
+      func << sourceFileName << ":" << F.getName().str() << "," << cmp_list.size() << "\n";
+      for (auto i = cmp_list.begin(); i != cmp_list.end(); i++){
+        func << *i << ",";
+      }
+      func << "\n";
+    }
+    if ((bbid_list.size() > 0) && FastMode){
+      func2 << sourceFileName << ":" << F.getName().str() << "," << bbid_list.size() << "\n";
+      for (auto i = bbid_list.begin(); i != bbid_list.end() ; i++){
+         func2 << *i << ",";
+      } 
+      func2 << "\n";
+    }
   }
-
+  if (FastMode) {
+    func.close();
+    func2.close();
+  }
   if (is_bc)
     OKF("Max constraint id is %d", CidCounter);
   return true;

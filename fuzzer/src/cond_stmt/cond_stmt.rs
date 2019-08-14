@@ -75,6 +75,27 @@ impl CondStmt {
             },
         }
     }
+    pub fn get_offset_len(&self) -> u32 {
+      let mut len = 0;
+      for i in 0..self.offsets.len() {
+        let end = self.offsets[i].end;
+        let bgn = self.offsets[i].begin;
+        let diff = if end > bgn {end - bgn} else { 0} ;
+        len += diff;
+      }
+      len
+    }
+
+    pub fn get_offset_opt_len(&self) -> u32 {
+      let mut len = 0;
+      for i in 0..self.offsets_opt.len() {
+        let end = self.offsets_opt[i].end;
+        let bgn = self.offsets_opt[i].begin;
+        let diff = if end > bgn {end - bgn} else { 0} ;
+        len += diff;
+      }
+      len
+    }
 
     pub fn is_tainted(&self) -> bool {
         self.offsets.len() > 0
@@ -86,7 +107,7 @@ impl CondStmt {
 
     pub fn mark_as_done(&mut self) {
         self.base.condition = defs::COND_DONE_ST;
-        self.clear();
+        //self.clear();
     }
 
     pub fn clear(&mut self) {

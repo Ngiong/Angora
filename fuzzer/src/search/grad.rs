@@ -8,7 +8,7 @@ use std::{
 pub struct GradUnit {
     pub sign: bool,
     pub val: u64,
-    pub pct: f64,
+    pub pct: f64, //normalized val
 }
 
 impl fmt::Debug for GradUnit {

@@ -3,6 +3,7 @@ use crate::{cond_stmt::CondStmt, executor::StatusType};
 use rand;
 use std::{
     fs,
+    fs::OpenOptions,
     io::prelude::*,
     mem,
     path::{Path, PathBuf},
@@ -14,8 +15,10 @@ use std::{
 // https://crates.io/crates/priority-queue
 use angora_common::config;
 use priority_queue::PriorityQueue;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
-pub struct Depot {
+pub struct Depot{
     pub queue: Mutex<PriorityQueue<CondStmt, QPriority>>,
     pub num_inputs: AtomicUsize,
     pub num_hangs: AtomicUsize,
@@ -88,7 +91,7 @@ impl Depot {
         read_from_file(&path)
     }
 
-    pub fn get_entry(&self) -> Option<(CondStmt, QPriority)> {
+    pub fn get_entry(&self, rels: &Vec<(String, u32)>, func_cmp_map : &HashMap<String, Vec<u32>>) -> Option<(CondStmt, QPriority)> {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -96,6 +99,35 @@ impl Depot {
                 poisoned.into_inner()
             },
         };
+        let mut cmp_set : HashSet<u32> = HashSet::new();
+        if !rels.is_empty(){
+          for k in rels{
+            let cmp_func_list = func_cmp_map.get(&k.0).unwrap();
+            for v in cmp_func_list{
+              cmp_set.insert(*v);
+            }
+          }
+          let iter = q.iter();
+          let mut highest : Option<(CondStmt, QPriority)>= None;
+          for (i, p) in iter {
+            let thr = QPriority(config::FUNC_TARGET_PRIORITY_THREASHOLD);
+            if *p < thr {continue;}
+            if cmp_set.contains(&i.base.cmpid){
+              highest = match highest { 
+                Some ((i2, p2)) => {if p2 < *p {Some((i.clone(), p.clone()))} else { Some((i2, p2))}},
+                None => {Some((i.clone(), p.clone()))}
+              }
+            }
+          }
+          if let Some ((clone_i, clone_p)) = highest {
+            if !clone_p.is_done(){
+              let q_inc = clone_p.inc(clone_i.base.op);
+              q.change_priority(&(clone_i), q_inc);
+            }
+            return Some((clone_i, clone_p));
+          }
+        }
+        // pick highest prioirty one.
         q.peek()
             .and_then(|x| Some((x.0.clone(), x.1.clone())))
             .and_then(|x| {
@@ -107,7 +139,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(&self, conds: Vec<CondStmt>) {
+    pub fn add_entries(& self, conds: Vec<CondStmt>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -119,9 +151,11 @@ impl Depot {
         for mut cond in conds {
             if cond.is_desirable {
                 if let Some(v) = q.get_mut(&cond) {
+                  //the COND aleady exists in the queue
                     if !v.0.is_done() {
                         // If existed one and our new one has two different conditions,
                         // this indicate that it is explored.
+                        // different condition -> different then/else condition -> explored!
                         if v.0.base.condition != cond.base.condition {
                             v.0.mark_as_done();
                             q.change_priority(&cond, QPriority::done());
@@ -143,7 +177,7 @@ impl Depot {
         }
     }
 
-    pub fn update_entry(&self, cond: CondStmt) {
+    pub fn update_entry(& self, cond: CondStmt) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -159,5 +193,27 @@ impl Depot {
         if cond.is_discarded() {
             q.change_priority(&cond, QPriority::done());
         }
+    }
+
+  pub fn log(&self, o_dir : &Path) {
+      let conds_dir : PathBuf = o_dir.parent().unwrap().join("conds");
+      let mkdir = match fs::create_dir(&conds_dir) { Ok(_) => true, Err(_) => false};
+      let mut logid = 0;
+      if !mkdir { loop {
+        let filename = format!("conds_log_{}.csv", logid);
+        let filepath : PathBuf = conds_dir.join(filename);
+        if !filepath.exists() {break; } else { logid += 1;}
+      }}
+      let log_file_name = conds_dir.join(format!("conds_log_{}.csv", logid));
+      let mut log_file = OpenOptions::new().write(true).create(true)
+                            .open(log_file_name).expect("can't open conds log");
+      let firstline = format!("cmpid,context,belong,condition,state,# of offsets,# of opt offsets,total offset len,total offset opt len,fuzz_times,priority");
+      if let Err(_) = writeln!(log_file, "{}", firstline) {eprintln!("can't write condslog");}
+      let q = match self.queue.lock() { Ok(g) => g, Err(p) => { p.into_inner()}};
+      let iter = q.iter();
+      for (i, p) in iter {
+        let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{}",i.base.cmpid,i.base.context,i.base.belong,i.base.condition,i.state,i.offsets.len(),i.offsets_opt.len(),i.get_offset_len(),i.get_offset_opt_len(),i.fuzz_times,p);
+        if let Err(_) = writeln!(log_file, "{}", condinfo) {eprintln!("can't write condslog");}
+      }
     }
 }

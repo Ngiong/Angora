@@ -40,6 +40,12 @@ impl ShmConds {
             Err(_) => None,
         }
     }
+    pub fn get_cmpid(&self) -> u32{
+       self.cond.cmpid
+    }
+    pub fn get_lb1(&self) -> u32{
+      self.cond.lb1
+    }
 
     #[inline(always)]
     fn mark_reachable(&mut self, condition: u32) {

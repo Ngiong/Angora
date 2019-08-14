@@ -5,8 +5,11 @@ use clap::{App, Arg};
 extern crate angora;
 extern crate angora_common;
 use angora::fuzz_main;
+use std::thread;
 
-fn main() {
+const STACK_SIZE: usize = 128 * 1024 * 1024;
+
+fn run() {
     let matches = App::new("angora-fuzzer")
         .version(crate_version!())
         .about("Angora is a mutation-based fuzzer. The main goal of Angora is to increase branch coverage by solving path constraints without symbolic execution.")
@@ -79,6 +82,18 @@ fn main() {
              .short("E")
              .long("disable_exploitation")
              .help("Disable the fuzzer to mutate sensitive bytes to exploit bugs"))
+        .arg(Arg::with_name("function_node_list")
+             .short("F")
+             .long("function_node_list")
+             .value_name("FUNC")
+             .help("Fucntion info node txt file")
+             .takes_value(true))
+        .arg(Arg::with_name("function_cmp_list")
+             .short("C")
+             .long("function_cmp_list")
+             .value_name("FUNC2")
+             .help("Function info cmp txt file")
+             .takes_value(true))
        .get_matches();
 
     fuzz_main(
@@ -94,5 +109,12 @@ fn main() {
         matches.occurrences_of("sync_afl") > 0,
         matches.occurrences_of("disable_afl_mutation") == 0,
         matches.occurrences_of("disable_exploitation") == 0,
+        matches.value_of("function_node_list"),
+        matches.value_of("function_cmp_list"),
     );
+}
+
+fn main(){
+   let ch = thread::Builder::new().stack_size(STACK_SIZE).spawn(run).unwrap();
+   ch.join().unwrap();
 }

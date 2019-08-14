@@ -27,7 +27,7 @@ pub static FORKSRV_SOCKET_PATH_VAR: &str = "ANGORA_FORKSRV_SOCKET_PATH";
 
 // command.rs
 pub static ANGORA_DIR_NAME: &str = "angora";
-pub static ANGORA_LOG_FILE: &str = "angora.log";
+pub static ANGORA_LOG_FILE: &str = "angora.csv";
 pub static COND_QUEUE_FILE: &str = "cond_queue.csv";
 pub static CHART_STAT_FILE: &str = "chart_stat.json";
 
