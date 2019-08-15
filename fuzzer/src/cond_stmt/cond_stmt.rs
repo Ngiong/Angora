@@ -17,6 +17,9 @@ pub struct CondStmt {
     pub state: CondState,
     pub num_minimal_optima: usize,
     pub linear: bool,
+
+    pub belongs : Vec<(u32,Vec<TagSeg>)>, // (input id, offset)
+    pub cur_input_fuzz_times : usize,
 }
 
 impl PartialEq for CondStmt {
@@ -50,6 +53,8 @@ impl CondStmt {
             state: CondState::default(),
             num_minimal_optima: 0,
             linear: false,
+            belongs : vec![],
+            cur_input_fuzz_times : 0,
         }
     }
 
@@ -137,5 +142,19 @@ impl CondStmt {
 
     pub fn is_done(&self) -> bool {
         self.base.is_done()
+    }
+
+    pub fn append_input(&mut self, cond : &mut CondStmt){
+      self.belongs.push((cond.base.belong, cond.offsets.clone()));
+      self.belongs.append(&mut cond.belongs);
+    }
+
+    pub fn next_input(&mut self){
+      if self.belongs.len() > 0 {
+        self.belongs.push((self.base.belong, self.offsets.clone()));
+        let (new_input, new_off) = self.belongs.remove(0);
+        self.base.belong = new_input;
+        self.offsets = new_off.clone();
+      }
     }
 }

@@ -319,6 +319,7 @@ pub fn get_relevance(new_target : String, input_path : &Path, executor : & mut E
   let mut res = rels[..num_func].to_vec();
   res.retain(|x| x.1 > 0);
   */
+  // log relevant fucntions 
   {
     let mut rel_file = OpenOptions::new().write(true).append(true).create(true).open(o_dir.parent().unwrap().join("rels.csv")).expect("Can't open rels.log file");
     if (*num_input - num_executed) == 0 {

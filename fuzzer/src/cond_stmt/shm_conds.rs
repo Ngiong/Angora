@@ -67,7 +67,6 @@ impl ShmConds {
         if output == defs::UNREACHABLE {
             output -= 1;
         }
-        //println!("output processed");
         output
     }
 }

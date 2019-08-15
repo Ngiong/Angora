@@ -162,10 +162,13 @@ impl Depot {
                         } else {
                             // Existed, but the new one are better
                             // If the cond is faster than the older one, we prefer the faster,
-                            if config::PREFER_FAST_COND && v.0.speed > cond.speed {
+                            if v.0.speed > cond.speed {
+                                cond.append_input(v.0);
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
+                            } else {
+                               v.0.append_input(&mut cond);
                             }
                         }
                     }
@@ -187,6 +190,10 @@ impl Depot {
         };
         if let Some(v) = q.get_mut(&cond) {
             v.0.clone_from(&cond);
+            if v.0.cur_input_fuzz_times > config::INPUT_FUZZ_MAX_TIME {
+              v.0.cur_input_fuzz_times = 0;
+              v.0.next_input();
+            }
         } else {
             warn!("Update entry: can not find this cond");
         }
@@ -207,12 +214,12 @@ impl Depot {
       let log_file_name = conds_dir.join(format!("conds_log_{}.csv", logid));
       let mut log_file = OpenOptions::new().write(true).create(true)
                             .open(log_file_name).expect("can't open conds log");
-      let firstline = format!("cmpid,context,belong,condition,state,# of offsets,# of opt offsets,total offset len,total offset opt len,fuzz_times,priority");
+      let firstline = format!("cmpid,context,belong,condition,state,# of offsets,total offset len,#belongs,fuzz_times,priority");
       if let Err(_) = writeln!(log_file, "{}", firstline) {eprintln!("can't write condslog");}
       let q = match self.queue.lock() { Ok(g) => g, Err(p) => { p.into_inner()}};
       let iter = q.iter();
       for (i, p) in iter {
-        let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{}",i.base.cmpid,i.base.context,i.base.belong,i.base.condition,i.state,i.offsets.len(),i.offsets_opt.len(),i.get_offset_len(),i.get_offset_opt_len(),i.fuzz_times,p);
+        let condinfo = format!("{},{},{},{},{},{},{},{},{},{}",i.base.cmpid,i.base.context,i.base.belong,i.base.condition,i.state,i.offsets.len(),i.get_offset_len(),i.belongs.len(),i.fuzz_times,p);
         if let Err(_) = writeln!(log_file, "{}", condinfo) {eprintln!("can't write condslog");}
       }
     }

@@ -12,7 +12,7 @@ pub const PREFER_FAST_COND: bool = true;
 pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
-pub const MAP_SIZE_POW2: usize = 21;
+pub const MAP_SIZE_POW2: usize = 19;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -53,3 +53,4 @@ pub const FUNC_TARGET_PRIORITY_THREASHOLD : u16 = 10;
 pub const FUNC_REL_NUM : usize = 0;
 pub const FUNC_REL_RATIO : f64 = 0.3;
 pub const FUNC_REL_THRESHOLD : f64 = 0.8;
+pub const INPUT_FUZZ_MAX_TIME : usize = 10;

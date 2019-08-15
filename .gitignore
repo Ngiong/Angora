@@ -21,3 +21,4 @@ obj-intel64/
 .DS_Store
 llvm_mode/build/
 08*
+/out_*/
