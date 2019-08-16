@@ -240,7 +240,7 @@ pub fn get_target_random(ex : & Executor) -> (String, f64, usize) {
   let tar_idx = wc.sample(&mut rng);
   ((&funcs)[tar_idx].0.clone(), -(rev_covs[tar_idx] as f64 / 1000.0 - 1.0), (&funcs)[tar_idx].1)
 }
-
+pub fn get_relevance(new_target : String, input_path : &Path, executor : & mut Executor, funclist_f : &mut File,
                    func_map : &HashMap<String, Vec<(usize, bool)>>,
                    func_rel_map : &mut HashMap<String, HashMap<String, u32>>, num_input : &mut u32, o_dir : &Path, cov : f64) -> Vec<(String, u32)> {
   let inputs = input_path.read_dir().expect("input_dir call failed");
