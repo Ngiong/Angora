@@ -1,6 +1,7 @@
 use super::filter;
 use std::io::Write;
 use super::load_pin_data::get_log_data_pin;
+use angora_common::config;
 use crate::{
     cond_stmt::{CondState, CondStmt},
     mut_input,
@@ -91,7 +92,7 @@ pub fn load_track_data(
         }
     };
 
-    if DEBUG::IO {
+    if config::DEBUG_IO {
     //cheong
     let cond_out_path = &out_f.parent().unwrap().parent().unwrap().join("conds.txt");
     let exists = &cond_out_path.exists();
