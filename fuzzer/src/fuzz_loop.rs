@@ -53,7 +53,9 @@ pub fn fuzz_loop(
     let mut depot_rec_time = Instant::now();
 
     while running.load(Ordering::Relaxed) {
-        if depot_rec_time.elapsed() >= Duration::from_secs(60 * 10) { depot.log(out_dir_path.as_path()); depot_rec_time = Instant::now(); }
+        if config::DEBUG_IO && (depot_rec_time.elapsed() >= Duration::from_secs(60 * 10)) {
+             depot.log(out_dir_path.as_path()); depot_rec_time = Instant::now();
+        }
         if func_exec >= config::FUNC_TARGET_NUMBER_OF_COND {
           let res = get_target_random(&executor);
           new_target = res.0;
@@ -239,7 +241,6 @@ pub fn get_target_random(ex : & Executor) -> (String, f64, usize) {
   ((&funcs)[tar_idx].0.clone(), -(rev_covs[tar_idx] as f64 / 1000.0 - 1.0), (&funcs)[tar_idx].1)
 }
 
-pub fn get_relevance(new_target : String, input_path : &Path, executor : & mut Executor, funclist_f : &mut File,
                    func_map : &HashMap<String, Vec<(usize, bool)>>,
                    func_rel_map : &mut HashMap<String, HashMap<String, u32>>, num_input : &mut u32, o_dir : &Path, cov : f64) -> Vec<(String, u32)> {
   let inputs = input_path.read_dir().expect("input_dir call failed");
@@ -256,11 +257,13 @@ pub fn get_relevance(new_target : String, input_path : &Path, executor : & mut E
         let mut func_list : Vec<String> = executor.branches.get_func(func_map);
         func_list.sort_unstable();
         func_list.dedup(); 
-        if let Err(_) = write!(funclist_f, "{},",idnum) {eprintln!("can't write 2");}
-        for f1 in &func_list{
-          if let Err(_) = write! (funclist_f, "{},", f1) {eprintln!("can't write 3");}
+        if config::DEBUG_IO {
+          if let Err(_) = write!(funclist_f, "{},",idnum) {eprintln!("can't write 2");}
+          for f1 in &func_list{
+            if let Err(_) = write! (funclist_f, "{},", f1) {eprintln!("can't write 3");}
+          }
+          if let Err(_) = writeln! (funclist_f, "") {eprintln!("can't write 3");}
         }
-        if let Err(_) = writeln! (funclist_f, "") {eprintln!("can't write 3");}
         for f1 in &func_list{
           for f2 in &func_list{
             *func_rel_map.get_mut(f1).expect("can't get mut from func_rel_map").get_mut(f2).expect("can't get mut from func_rel_map") += 1;
@@ -271,7 +274,7 @@ pub fn get_relevance(new_target : String, input_path : &Path, executor : & mut E
     }
   }
   //print all relevance, not necessary for normal run.
-  if num_executed > 0 {
+  if config::DEBUG_IO && (num_executed > 0) {
     let rel_dir : PathBuf = o_dir.parent().unwrap().join("rels");
     let mkdir = match fs::create_dir(&rel_dir) { Ok(_) => true, Err(_) => false};
     let mut recid = 0;
@@ -310,17 +313,8 @@ pub fn get_relevance(new_target : String, input_path : &Path, executor : & mut E
   if target_runs != 0 {
     rels.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
   }
-  /*
-  rels.sort_unstable_by_key(|elem| -(elem.1 as i32));
-  let num_func :usize =
-      if config::FUNC_REL_NUM == 0
-      {(config::FUNC_REL_RATIO * rels.len() as f64) as usize}
-      else { config::FUNC_REL_NUM };
-  let mut res = rels[..num_func].to_vec();
-  res.retain(|x| x.1 > 0);
-  */
   // log relevant fucntions 
-  {
+  if config::DEBUG_IO {
     let mut rel_file = OpenOptions::new().write(true).append(true).create(true).open(o_dir.parent().unwrap().join("rels.csv")).expect("Can't open rels.log file");
     if (*num_input - num_executed) == 0 {
       if let Err(_) = writeln!(rel_file,"input id,# of input,target,cov,target,max_rel,rel_funcs") { eprintln!("Can't write in rels.log file");} 
