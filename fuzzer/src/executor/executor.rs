@@ -457,8 +457,11 @@ impl Executor {
     }
 
     pub fn update_log(&mut self) {
-        let q = match self.depot.queue.lock(){ Ok(guard)=> guard, Err(poisoned) => poisoned.into_inner()};
-        let len = q.len();
+        let len;
+        {let q = match self.depot.queue.lock(){ Ok(guard)=> guard,
+                                      Err(poisoned) => poisoned.into_inner()};
+        len = q.len();
+        }
         self.global_stats
             .write()
             .unwrap()
