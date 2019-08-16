@@ -1,4 +1,7 @@
 /target/
+/FInfos19/
+/subjects19/
+/subjects/
 **/*.rs.bk
 Cargo.lock
 .vscode
