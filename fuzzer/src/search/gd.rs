@@ -51,6 +51,10 @@ impl<'a> GdSearch<'a> {
 
     pub fn run<T: Rng>(&mut self, rng: &mut T) {
         let mut input = self.handler.get_f_input();
+        if input.len() == 0 {
+          self.handler.cond.next_input();
+          return;
+        }
         assert!(
             input.len() > 0,
             "Input length == 0!! {:?}",

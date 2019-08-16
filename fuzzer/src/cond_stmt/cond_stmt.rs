@@ -145,7 +145,9 @@ impl CondStmt {
     }
 
     pub fn append_input(&mut self, cond : &mut CondStmt){
-      self.belongs.push((cond.base.belong, cond.offsets.clone()));
+      if cond.offsets.len() != 0 {
+        self.belongs.push((cond.base.belong, cond.offsets.clone()));
+      }
       self.belongs.append(&mut cond.belongs);
     }
 
