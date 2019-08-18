@@ -92,6 +92,8 @@ impl Depot {
     }
 
     pub fn get_entry(&self, rels: &Vec<(String, u32)>, func_cmp_map : &HashMap<String, Vec<u32>>) -> Option<(CondStmt, QPriority)> {
+        /*
+        //prioritize with func relevance.
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -127,6 +129,7 @@ impl Depot {
             return Some((clone_i, clone_p));
           }
         }
+        */
         // pick highest prioirty one.
         q.peek()
             .and_then(|x| Some((x.0.clone(), x.1.clone())))
@@ -163,12 +166,12 @@ impl Depot {
                             // Existed, but the new one are better
                             // If the cond is faster than the older one, we prefer the faster,
                             if v.0.speed > cond.speed {
-                                cond.append_input(v.0);
+                                //cond.append_input(v.0);
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
                             } else {
-                               v.0.append_input(&mut cond);
+                               //v.0.append_input(&mut cond);
                             }
                         }
                     }
@@ -192,7 +195,7 @@ impl Depot {
             v.0.clone_from(&cond);
             if v.0.cur_input_fuzz_times > config::INPUT_FUZZ_MAX_TIME {
               v.0.cur_input_fuzz_times = 0;
-              v.0.next_input();
+              //v.0.next_input();
             }
         } else {
             warn!("Update entry: can not find this cond");
