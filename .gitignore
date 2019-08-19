@@ -4,6 +4,8 @@
 /FInfos19/
 /subjects19/
 /subjects/
+*.tt
+*.c.txt
 **/*.rs.bk
 Cargo.lock
 .vscode
