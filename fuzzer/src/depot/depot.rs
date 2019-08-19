@@ -91,9 +91,7 @@ impl Depot {
         read_from_file(&path)
     }
 
-    pub fn get_entry(&self, rels: &Vec<(String, u32)>, func_cmp_map : &HashMap<String, Vec<u32>>) -> Option<(CondStmt, QPriority)> {
-        /*
-        //prioritize with func relevance.
+    pub fn get_entry(&self, _rels: &Vec<(String, u32)>, _func_cmp_map : &HashMap<String, Vec<u32>>) -> Option<(CondStmt, QPriority)> {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -101,6 +99,8 @@ impl Depot {
                 poisoned.into_inner()
             },
         };
+        /*
+        //prioritize with func relevance.
         let mut cmp_set : HashSet<u32> = HashSet::new();
         if !rels.is_empty(){
           for k in rels{
