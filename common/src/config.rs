@@ -12,7 +12,7 @@ pub const PREFER_FAST_COND: bool = true;
 pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
-pub const MAP_SIZE_POW2: usize = 19;
+pub const MAP_SIZE_POW2: usize = 20;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -21,7 +21,7 @@ pub const TIME_LIMIT: u64 = 1;
 pub const MEM_LIMIT: u64 = 200; // MB
 pub const TIME_LIMIT_TRACK: u64 = 12;
 pub const MEM_LIMIT_TRACK: u64 = 0;
-pub const LONG_FUZZ_TIME: usize = 8;
+pub const LONG_FUZZ_TIME: usize = 2;
 pub const MAX_INVARIABLE_NUM: usize = 16;
 pub const MAX_NUM_MINIMAL_OPTIMA_ALL: usize = 28;
 // based the bit bucket: [1], [2], [3], [4, 7], [8, 15], [16, 31], [32, 127], [128, infinity]
@@ -46,7 +46,7 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 
 //Cheong
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 48;
 pub const FUNC_CHOOSE_LOOP_MAX : u32 = 40;
 pub const FUNC_TARGET_NUMBER_OF_COND : u32 = 20;
 pub const FUNC_TARGET_PRIORITY_THREASHOLD : u16 = 10;

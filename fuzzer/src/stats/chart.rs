@@ -125,7 +125,7 @@ impl ChartStats {
             self.num_inputs.0,
             self.num_hangs.0,
             self.num_crashes.0,
-            self.avg_exec_time,
+            self.num_exec,
             self.state.mini_state_log()
         )
     }

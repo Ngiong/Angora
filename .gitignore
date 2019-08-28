@@ -30,3 +30,6 @@ obj-intel64/
 llvm_mode/build/
 08*
 /out_*/
+/gcov/
+/inputs/
+*.gcov

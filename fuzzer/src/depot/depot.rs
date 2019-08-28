@@ -16,7 +16,7 @@ use std::{
 use angora_common::config;
 use priority_queue::PriorityQueue;
 use std::collections::HashMap;
-use std::collections::HashSet;
+//use std::collections::HashSet;
 
 pub struct Depot{
     pub queue: Mutex<PriorityQueue<CondStmt, QPriority>>,
