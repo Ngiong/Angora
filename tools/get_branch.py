@@ -3,6 +3,7 @@ import subprocess
 
 if len(sys.argv) != 5:
   print("python3 get_branch.py angora.csv \"executable_with_ar\" gcov_list.txt out.txt")
+  exit()
 
 def progressBar(value, endvalue, bar_length=50):
   percent = float(value) / endvalue
@@ -14,6 +15,10 @@ def progressBar(value, endvalue, bar_length=50):
 num_lines = sum(1 for line in open(sys.argv[1]))
 
 csvf = open(sys.argv[1], "r")
+orig = False
+if sys.argv[1][-3:] == "log":
+  orig = True
+
 q_path = sys.argv[1][:-10] + "queue/"
 gcovf = open(sys.argv[3], "r")
 gcovfiles = gcovf.readlines()
@@ -25,7 +30,9 @@ cmdline = ["find", "/home/cheong/fuzz_subjects/binutils-2.32-gcov/", "-name", "*
 subprocess.run(cmdline)
 
 prevtcs = 0 
-csvf.readline()
+if not orig:
+  csvf.readline()
+
 lineidx = 0
 for line in csvf: 
   if lineidx % 10 == 0:
@@ -37,7 +44,7 @@ for line in csvf:
   tcs = int(line[2])
   for i in range(prevtcs , tcs):
     tc_name = q_path + "id:" + "0" * (6 - len(str(i))) + str(i)
-    cmdline = ["timeout" , "0.5"] + sys.argv[2].split(" ") + [tc_name]
+    cmdline = ["timeout" , "0.1"] + sys.argv[2].split(" ") + [tc_name]
     subprocess.run(cmdline, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
   covered_branch = 0
   for gfile in gcovfiles:
