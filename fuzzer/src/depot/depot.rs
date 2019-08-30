@@ -15,8 +15,6 @@ use std::{
 // https://crates.io/crates/priority-queue
 use angora_common::config;
 use priority_queue::PriorityQueue;
-use std::collections::HashMap;
-//use std::collections::HashSet;
 
 pub struct Depot{
     pub queue: Mutex<PriorityQueue<CondStmt, QPriority>>,
@@ -91,7 +89,7 @@ impl Depot {
         read_from_file(&path)
     }
 
-    pub fn get_entry(&self, _rels: &Vec<(String, u32)>, _func_cmp_map : &HashMap<String, Vec<u32>>) -> Option<(CondStmt, QPriority)> {
+    pub fn get_entry(&self) -> Option<(CondStmt, QPriority)> {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -99,37 +97,6 @@ impl Depot {
                 poisoned.into_inner()
             },
         };
-        /*
-        //prioritize with func relevance.
-        let mut cmp_set : HashSet<u32> = HashSet::new();
-        if !rels.is_empty(){
-          for k in rels{
-            let cmp_func_list = func_cmp_map.get(&k.0).unwrap();
-            for v in cmp_func_list{
-              cmp_set.insert(*v);
-            }
-          }
-          let iter = q.iter();
-          let mut highest : Option<(CondStmt, QPriority)>= None;
-          for (i, p) in iter {
-            let thr = QPriority(config::FUNC_TARGET_PRIORITY_THREASHOLD);
-            if *p < thr {continue;}
-            if cmp_set.contains(&i.base.cmpid){
-              highest = match highest { 
-                Some ((i2, p2)) => {if p2 < *p {Some((i.clone(), p.clone()))} else { Some((i2, p2))}},
-                None => {Some((i.clone(), p.clone()))}
-              }
-            }
-          }
-          if let Some ((clone_i, clone_p)) = highest {
-            if !clone_p.is_done(){
-              let q_inc = clone_p.inc(clone_i.base.op);
-              q.change_priority(&(clone_i), q_inc);
-            }
-            return Some((clone_i, clone_p));
-          }
-        }
-        */
         // pick highest prioirty one.
         q.peek()
             .and_then(|x| Some((x.0.clone(), x.1.clone())))

@@ -12,7 +12,7 @@ pub const PREFER_FAST_COND: bool = true;
 pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
-pub const MAP_SIZE_POW2: usize = 20;
+pub const MAP_SIZE_POW2: usize = 19;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -46,7 +46,7 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 
 //Cheong
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 48;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 200;
 pub const FUNC_CHOOSE_LOOP_MAX : u32 = 40;
 pub const FUNC_TARGET_NUMBER_OF_COND : u32 = 20;
 pub const FUNC_TARGET_PRIORITY_THREASHOLD : u16 = 10;

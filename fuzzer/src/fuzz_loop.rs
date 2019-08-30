@@ -3,8 +3,7 @@ use crate::{
     executor::Executor, fuzz_type::FuzzType, search::*, stats,
 };
 use angora_common::config;
-use rand::{prelude::*, distributions::WeightedIndex};
-//use rand::seq::SliceRandom;
+use rand::prelude::*;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
@@ -35,8 +34,6 @@ pub fn fuzz_loop(
     );
     let mut func_list_log  = OpenOptions::new().write(true).append(true).create(true).open(out_dir_path.as_path().parent().unwrap().join("tc_func.csv")).expect("Can't open funclist");
     if let Err(_) = writeln!(func_list_log, "tcid, funcs") {eprintln!("can't write funclist");}
-    
-    let target_funcs : Vec<(String, u32)> = vec![];
     let mut func_rel_map : HashMap<String, HashMap<String, u32>> = HashMap::new();
     for k in func_map.keys() {
       let mut tmp_map = HashMap::new();
@@ -46,37 +43,15 @@ pub fn fuzz_loop(
       func_rel_map.insert(k.clone(), tmp_map);
     }
     let mut num_cal_input = 0;
-    //let mut func_exec = config::FUNC_TARGET_NUMBER_OF_COND;
-    let mut new_target :String = String::new();
-    //let mut cov : f64;
-    //let mut num_node : usize;
     let mut depot_rec_time = Instant::now();
 
     while running.load(Ordering::Relaxed) {
         if config::DEBUG_IO && (depot_rec_time.elapsed() >= Duration::from_secs(60 * 10)) {
              depot.log(out_dir_path.as_path()); depot_rec_time = Instant::now();
         }
-/*
-        if func_exec >= config::FUNC_TARGET_NUMBER_OF_COND {
-          let res = get_target_random(&executor);
-          new_target = res.0;
-          cov = res.1;
-          num_node = res.2;
-          debug!("new target : {}, cov : {}/{}", new_target, cov,num_node);
-          if (func_map.len() > 0 && !new_target.is_empty()) &&
-                (target_funcs.len() < 1 || new_target != target_funcs.get(0).expect("can't get first elem from target_funcs").0){
-            target_funcs = get_relevance (new_target, &depot.dirs.inputs_dir, &mut executor, &mut func_list_log,
-                                         &func_map, &mut func_rel_map, &mut num_cal_input, out_dir_path.as_path(), cov);
-          }
-          debug!("calculated input : {}", num_cal_input);
-          func_exec = 0;
-        } else {
-          func_exec += 1;
-        }
-*/
-         get_relevance (new_target.clone(), &depot.dirs.inputs_dir, &mut executor, &mut func_list_log,
-                                         &func_map, &mut func_rel_map, &mut num_cal_input, out_dir_path.as_path(), 0.0);
-        let entry = match depot.get_entry(&target_funcs, &func_map2) {
+        get_relevance (&depot.dirs.inputs_dir, &mut executor, &mut func_list_log,
+                                         &func_map, &mut func_rel_map, &mut num_cal_input, out_dir_path.as_path());
+        let entry = match depot.get_entry() {
             Some(e) => e,
             None => break,
         };
@@ -97,23 +72,6 @@ pub fn fuzz_loop(
         trace!("{:?}", cond);
 
         let belong_input = cond.base.belong as usize;
-
-        /*
-        if config::ENABLE_PREFER_FAST_COND && cond.base.op == defs::COND_AFL_OP {
-            let mut rng = thread_rng();
-            let speed_ratio = depot.get_speed_ratio(belong_input);
-            if speed_ratio > 1 {
-                // [2, 3] -> 2
-                // [4, 7] -> 3
-                // [7, 15] -> 4
-                // [16, ..] -> 5
-                let weight = ((speed_ratio + 1) as f32).log2().ceil() as u32;
-                if !rng.gen_weighted_bool(weight) {
-                    continue;
-                }
-            }
-        }
-        */
 
         let buf = depot.get_input_buf(belong_input);
 
@@ -175,78 +133,9 @@ pub fn fuzz_loop(
     }
 }
 
-#[allow(dead_code)]
-pub fn get_target(ex : & Executor) -> (String, f64, usize) {
-  let mut target : String = String::new();
-  let mut mincov : f64 = 100.0;
-  let mut min_num_node = 0;
-  for (k, elem) in &ex.func_map { //hashmap <String, Vec<(usize, bool)>>
-    let num_node = elem.len();
-    let mut num_cov = 0;
-    for v in elem {
-      if v.1 == true {num_cov += 1;}
-    }
-    let cov : f64 = num_cov as f64 / num_node as f64;
-    if cov > 0.0 && mincov > cov {
-      mincov = cov;
-      min_num_node = num_node;
-      target = k.clone();
-    }
-  }
-  (target, mincov, min_num_node)
-}
-
-#[allow(dead_code)]
-pub fn get_target_uniform_random(ex : & Executor) -> (String, f64, usize) {
-  let mut funcs = Vec::new(); 
-  for (k, _elem) in &ex.func_map {
-    funcs.push(k.clone());
-  }
-   //pick uniformly random
-  let mut loop_idx = 0;
-  loop {
-    let target : String = if let Some(strin) = funcs.choose(&mut rand::thread_rng()){strin.to_string()} else {return ("".to_string(), 0.0, 0);};
-    let blocks = ex.func_map.get(&target).expect("Can't get target from map");
-    let num_node = blocks.len();
-    let mut num_cov = 0;
-    for b in blocks{
-      if b.1 == true {num_cov += 1;}
-    }
-    let cov : f64 = num_cov as f64 / num_node as f64;
-    if cov > 0.0 {
-      return (target, cov, num_node);
-    } 
-    loop_idx += 1;
-    if loop_idx > config::FUNC_CHOOSE_LOOP_MAX {
-      return ("".to_string(), 0.0, 0);
-    }
-  } 
-}
-
-pub fn get_target_random(ex : & Executor) -> (String, f64, usize) {
-  let mut rev_covs = Vec::new();
-  let mut funcs = Vec::new();
-  for (k, elem) in &ex.func_map{
-    let num_node = elem.len();
-    let mut num_cov = 0;
-    for v in elem {
-      if v.1 == true {num_cov += 1;}
-    }
-    let cov : f64 = num_cov as f64 / num_node as f64;
-    if cov > 0.0 {
-      rev_covs.push( ((1.0 -cov) * 1000.0) as u32);
-      funcs.push ((k.clone(),num_node));
-    }
-  }
-  if funcs.len() == 0 { return ("".to_string(), 0.0, 0);}
-  let mut rng = rand::thread_rng();
-  let wc = WeightedIndex::new(&rev_covs).unwrap();
-  let tar_idx = wc.sample(&mut rng);
-  ((&funcs)[tar_idx].0.clone(), -(rev_covs[tar_idx] as f64 / 1000.0 - 1.0), (&funcs)[tar_idx].1)
-}
-pub fn get_relevance(_new_target : String, input_path : &Path, executor : & mut Executor, funclist_f : &mut File,
+pub fn get_relevance(input_path : &Path, executor : & mut Executor, funclist_f : &mut File,
                    func_map : &HashMap<String, Vec<(usize, bool)>>,
-                   func_rel_map : &mut HashMap<String, HashMap<String, u32>>, num_input : &mut u32, o_dir : &Path, _cov : f64) {// -> Vec<(String, u32)> {
+                   func_rel_map : &mut HashMap<String, HashMap<String, u32>>, num_input : &mut u32, o_dir : &Path) {
   let inputs = input_path.read_dir().expect("input_dir call failed");
   let mut num_executed = 0;
   for input in inputs {
@@ -307,42 +196,4 @@ pub fn get_relevance(_new_target : String, input_path : &Path, executor : & mut 
       if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
     }
   }
-
-  /*
-  let mut rels : Vec <(String, u32)> = Vec::new();
-  let target_rels : &HashMap<String, u32> = func_rel_map.get(&new_target).expect("can't get new target from func_rel_map");
-  let mut target_runs = 0;
-  for (k, v) in target_rels{
-    rels.push((k.clone(), *v));
-    if *k == new_target { target_runs = *v; }
-  }
-  if target_runs != 0 {
-    rels.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
-  }
-
-  
-  // log relevant fucntions 
-  if config::DEBUG_IO {
-    let mut rel_file = OpenOptions::new().write(true).append(true).create(true).open(o_dir.parent().unwrap().join("rels.csv")).expect("Can't open rels.log file");
-    if (*num_input - num_executed) == 0 {
-      if let Err(_) = writeln!(rel_file,"input id,# of input,target,cov,target,max_rel,rel_funcs") { eprintln!("Can't write in rels.log file");} 
-    }
-    let mut rel_str = String::new();
-    rel_str.push_str(&(*num_input - num_executed).to_string());
-    rel_str.push_str(",");
-    rel_str.push_str(&num_executed.to_string());
-    rel_str.push_str(",");
-    rel_str.push_str(&new_target);
-    rel_str.push_str(",");
-    rel_str.push_str(&format!("{:.2}",cov));
-    rel_str.push_str(",");
-    for elem in &rels{
-      rel_str.push_str(&elem.0);
-      rel_str.push_str(",");
-      rel_str.push_str(&(&elem.1.to_string()));
-      rel_str.push_str(",");
-    }
-    if let Err(_) = writeln!(rel_file,"{}",rel_str) { eprintln!("Can't write in rels.log file");}
-  } */
-  //rels
 }

@@ -347,7 +347,7 @@ void AngoraLLVMPass::initVariables(Module &M) {
   output_cond_loc = !!getenv(OUTPUT_COND_LOC_VAR);
 
   num_fn_ctx = -1;
-  char* custom_fn_ctx = 0; //getenv(CUSTOM_FN_CTX);
+  char* custom_fn_ctx = getenv(CUSTOM_FN_CTX);
   if (custom_fn_ctx) {
     num_fn_ctx = atoi(custom_fn_ctx);
     if (num_fn_ctx < 0 || num_fn_ctx >= 32) {
