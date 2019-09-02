@@ -10,7 +10,6 @@ use std::sync::{
 };
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
 use std::{collections::HashMap, fs::{OpenOptions,File}, io::Write};
 use crate::depot::file::read_from_file;
 
@@ -43,12 +42,7 @@ pub fn fuzz_loop(
       func_rel_map.insert(k.clone(), tmp_map);
     }
     let mut num_cal_input = 0;
-    let mut depot_rec_time = Instant::now();
-
     while running.load(Ordering::Relaxed) {
-        if config::DEBUG_IO && (depot_rec_time.elapsed() >= Duration::from_secs(60 * 10)) {
-             depot.log(out_dir_path.as_path()); depot_rec_time = Instant::now();
-        }
         get_relevance (&depot.dirs.inputs_dir, &mut executor, &mut func_list_log,
                                          &func_map, &mut func_rel_map, &mut num_cal_input, out_dir_path.as_path());
         let entry = match depot.get_entry() {

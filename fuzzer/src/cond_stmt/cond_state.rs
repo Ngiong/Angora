@@ -155,6 +155,7 @@ impl NextState for CondStmt {
     }
     
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
+        let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
         if func_cmp_map.len() == 0 {return ; }
         let mut cmp_list : Vec<u32> = Vec::new();
@@ -173,10 +174,13 @@ impl NextState for CondStmt {
             self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
           }
         }
+        let after_size = self.get_offset_len() + self.get_offset_opt_len();
+        self.ext_offset_size = after_size - before_size;
     }
     
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>){
+        let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetRelFunc;
         if func_cmp_map.len() == 0 {return ; }
         let mut cmp_list : Vec<u32> = Vec::new();
@@ -194,6 +198,7 @@ impl NextState for CondStmt {
            if *k == cmp_func { target_runs = *v;}
         }
         rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
+        //rel_list.retain(|x| (x.1 as f64 / target_runs as f64) <= 0.2 );
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
@@ -210,6 +215,8 @@ impl NextState for CondStmt {
             self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
           }
         }
+        let after_size = self.get_offset_len() + self.get_offset_opt_len();
+        self.ext_offset_size_rel = after_size - before_size;
     }
 
     fn to_unsolvable(&mut self) {

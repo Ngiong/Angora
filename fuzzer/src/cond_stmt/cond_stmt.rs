@@ -19,7 +19,8 @@ pub struct CondStmt {
     pub linear: bool,
 
     pub belongs : Vec<(u32,Vec<TagSeg>)>, // (input id, offset)
-    pub cur_input_fuzz_times : usize,
+    pub ext_offset_size : u32,
+    pub ext_offset_size_rel : u32,
 }
 
 impl PartialEq for CondStmt {
@@ -54,7 +55,8 @@ impl CondStmt {
             num_minimal_optima: 0,
             linear: false,
             belongs : vec![],
-            cur_input_fuzz_times : 0,
+            ext_offset_size : 0,
+            ext_offset_size_rel : 0,
         }
     }
 
