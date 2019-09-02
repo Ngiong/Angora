@@ -34,7 +34,6 @@ pub struct Executor {
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
     pub num_fuzzed : u32,
-    pub func_map : HashMap<String, Vec<(usize, bool)>>,
 }
 
 impl Executor {
@@ -43,7 +42,6 @@ impl Executor {
         global_branches: Arc<branches::GlobalBranches>,
         depot: Arc<depot::Depot>,
         global_stats: Arc<RwLock<stats::ChartStats>>,
-        func_map : HashMap<String, Vec<(usize, bool)>>,
     ) -> Self {
         // ** Share Memory **
         let branches = branches::Branches::new(global_branches);
@@ -101,7 +99,6 @@ impl Executor {
             global_stats,
             local_stats: Default::default(),
             num_fuzzed : 0,
-            func_map : func_map,
         }
     }
 
@@ -232,20 +229,10 @@ impl Executor {
 
     fn do_if_has_new(&mut self, buf: &Vec<u8>, status: StatusType, _explored: bool, cmpid: u32) {
         // new edge: one byte in bitmap
-        let (has_new_path, has_new_edge, edge_num, new_blocks) = self.branches.has_new(status);
+        let (has_new_path, has_new_edge, edge_num) = self.branches.has_new(status);
 
         // measure function block covearge
         // Vec<usize>
-        if new_blocks.len() > 0 {
-          for (_k, v) in self.func_map.iter_mut() {
-            for v2 in v.iter_mut() {
-              for &bb in &new_blocks {
-                if bb == v2.0 {  *v2 = (bb, true); break;}
-              }
-            }
-          }
-        }
-
         if has_new_path {
             self.has_new_path = true;
             self.local_stats.find_new(&status);
@@ -455,12 +442,35 @@ impl Executor {
         };
         ret
     }
+    
+    pub fn get_func(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>, input_path : &Path) -> Vec<String>{
+      let buf = depot::file::read_from_file(input_path);
+      let cond_list = self.track(0 , &buf, 0);  //id, speed doesn't matter
+      let mut func_list = vec![];
+      for c in cond_list{
+        let mut found = false;
+        for (funcname, cmplist) in func_cmp_map{
+          for cmpi in cmplist {
+            if *cmpi == c.base.cmpid {
+              func_list.push(funcname.clone());
+              found = true;
+              break;
+            }
+          }
+          if found {
+            break;
+          }
+        }
+      }
+      func_list
+    }
 
     pub fn update_log(&mut self) {
         let len;
-        {let q = match self.depot.queue.lock(){ Ok(guard)=> guard,
+        {
+          let q = match self.depot.queue.lock(){ Ok(guard)=> guard,
                                       Err(poisoned) => poisoned.into_inner()};
-        len = q.len();
+          len = q.len();
         }
         self.global_stats
             .write()

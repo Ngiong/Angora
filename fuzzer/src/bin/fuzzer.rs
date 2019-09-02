@@ -79,12 +79,6 @@ fn main() {
              .short("E")
              .long("disable_exploitation")
              .help("Disable the fuzzer to mutate sensitive bytes to exploit bugs"))
-        .arg(Arg::with_name("function_node_list")
-             .short("F")
-             .long("function_node_list")
-             .value_name("FUNC")
-             .help("Fucntion info node txt file")
-             .takes_value(true))
         .arg(Arg::with_name("function_cmp_list")
              .short("C")
              .long("function_cmp_list")
@@ -106,7 +100,6 @@ fn main() {
         matches.occurrences_of("sync_afl") > 0,
         matches.occurrences_of("disable_afl_mutation") == 0,
         matches.occurrences_of("disable_exploitation") == 0,
-        matches.value_of("function_node_list"),
         matches.value_of("function_cmp_list"),
     );
 }

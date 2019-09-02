@@ -165,8 +165,8 @@ impl Depot {
     }
 
   pub fn log(&self, o_dir : &Path, rec_idx : &mut u32) {
-      let conds_dir : PathBuf = o_dir.parent().unwrap().join("conds");
-      fs::create_dir(&conds_dir);
+      let conds_dir : PathBuf = o_dir.join("conds");
+      if let Err(_) = fs::create_dir(&conds_dir) {();};
       let log_file_name = conds_dir.join(format!("conds_log_{}.csv", rec_idx));
       *rec_idx += 1;
       let mut log_file = OpenOptions::new().write(true).create(true)

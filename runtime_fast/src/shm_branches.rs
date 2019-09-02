@@ -6,10 +6,9 @@ use angora_common::shm;
 use std::env;
 use std::process;
 
-#[allow(dead_code)]
 pub type BranchBuf = [u8; BRANCHES_SIZE];
-pub type BranchBuf2 = [u8; BRANCHES_SIZE * 2];
-static mut __ANGORA_AREA_INITIAL: BranchBuf2 = [255; BRANCHES_SIZE *2];
+//pub type BranchBuf2 = [u8; BRANCHES_SIZE * 2];
+static mut __ANGORA_AREA_INITIAL: BranchBuf = [255; BRANCHES_SIZE ];
 
 #[no_mangle]
 pub static mut __angora_area_ptr: *const u8 = unsafe{  &__ANGORA_AREA_INITIAL[0] as *const u8 };
@@ -19,7 +18,7 @@ pub fn map_branch_counting_shm() {
     match id_val {
         Ok(val) => {
             let shm_id = val.parse::<i32>().expect("Could not parse i32 value.");
-            let mem = shm::SHM::<BranchBuf2>::from_id(shm_id);
+            let mem = shm::SHM::<BranchBuf>::from_id(shm_id);
             if mem.is_fail() {
               eprintln!("fail to load shm");
               process::exit(1);

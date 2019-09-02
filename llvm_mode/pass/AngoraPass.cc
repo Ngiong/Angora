@@ -380,9 +380,9 @@ void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_l
   if (!FastMode || skipBasicBlock()) return;
  
   unsigned int cur_loc = getRandomBasicBlockId();
-  bb_list.push_back(cur_loc);
+  //bb_list.push_back(cur_loc);
   ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
-  ConstantInt *CurBLoc = ConstantInt::get(Int32Ty, cur_loc + MAP_SIZE);
+  //ConstantInt *CurBLoc = ConstantInt::get(Int32Ty, cur_loc + MAP_SIZE);
 
   BasicBlock::iterator IP = BB.getFirstInsertionPt();
   IRBuilder<> IRB(&(*IP));
@@ -403,14 +403,14 @@ void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_l
   setValueNonSan(MapPtrIdx);
 
   // get Map of block cov
-  Value *MapBPtrIdx = IRB.CreateGEP(MapPtr, CurBLoc);
-  setValueNonSan(MapBPtrIdx);
+  //Value *MapBPtrIdx = IRB.CreateGEP(MapPtr, CurBLoc);
+  //setValueNonSan(MapBPtrIdx);
 
   // Increase 1 : IncRet <- Map[idx] + 1
   LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
   setInsNonSan(Counter);
-  LoadInst *BCounter = IRB.CreateLoad(MapBPtrIdx);
-  setInsNonSan(BCounter);
+  //LoadInst *BCounter = IRB.CreateLoad(MapBPtrIdx);
+  //setInsNonSan(BCounter);
 
   // Avoid overflow  //deprecated
   /*
@@ -432,24 +432,24 @@ void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_l
   
   Value *IncRet = IRB.CreateAdd(Counter, ConstantInt::get(Int8Ty, 1));
   setValueNonSan(IncRet);
-  Value *BIncRet = IRB.CreateAdd(BCounter, ConstantInt::get(Int8Ty, 1));
-  setValueNonSan(BIncRet);
+  //Value *BIncRet = IRB.CreateAdd(BCounter, ConstantInt::get(Int8Ty, 1));
+  //setValueNonSan(BIncRet);
   Value *IsZero = IRB.CreateICmpEQ(IncRet, ConstantInt::get(Int8Ty, 0));
   setValueNonSan(IsZero);
-  Value *BIsZero = IRB.CreateICmpEQ(BIncRet, ConstantInt::get(Int8Ty, 0));
-  setValueNonSan(BIsZero);
+  //Value *BIsZero = IRB.CreateICmpEQ(BIncRet, ConstantInt::get(Int8Ty, 0));
+  //setValueNonSan(BIsZero);
   Value *IncVal = IRB.CreateZExt(IsZero, Int8Ty);
   setValueNonSan(IncVal);
-  Value *BIncVal = IRB.CreateZExt(BIsZero, Int8Ty);
-  setValueNonSan(BIncVal);
+  //Value *BIncVal = IRB.CreateZExt(BIsZero, Int8Ty);
+  //setValueNonSan(BIncVal);
   IncRet = IRB.CreateAdd(IncRet, IncVal);
   setValueNonSan(IncRet);
-  BIncRet = IRB.CreateAdd(BIncRet, BIncVal);
-  setValueNonSan(BIncRet);
+  //BIncRet = IRB.CreateAdd(BIncRet, BIncVal);
+  //setValueNonSan(BIncRet);
 
   // Store Back Map[idx]
   IRB.CreateStore(IncRet, MapPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
-  IRB.CreateStore(BIncRet, MapBPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
+  //IRB.CreateStore(BIncRet, MapBPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
 
   Value *NewPrevLoc = NULL;
   if (num_fn_ctx != 0) { // Call-based context
@@ -902,14 +902,12 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     return true;
 
   std::ofstream func;
-  std::ofstream func2;
   std::string sourceFileName = M.getSourceFileName();
   if (sourceFileName.at(0) == '.' && sourceFileName.at(1) == '/') {
     sourceFileName.erase(0,2);
   }
   if (FastMode){
     func.open("FInfo-cmp-" + sourceFileName + ".txt", std::ofstream::out | std::ofstream::app);
-    func2.open("FInfo-bb-" + sourceFileName + ".txt", std::ofstream::out | std::ofstream::app);
   }
   for (auto &F : M) {
     if (F.isDeclaration() || F.getName().startswith(StringRef("asan.module")))
@@ -960,6 +958,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
       }
       func << "\n";
     }
+    /*
     if ((bbid_list.size() > 0) && FastMode){
       func2 << sourceFileName << ":" << F.getName().str() << "," << bbid_list.size() << "\n";
       for (auto i = bbid_list.begin(); i != bbid_list.end() ; i++){
@@ -967,10 +966,10 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
       } 
       func2 << "\n";
     }
+    */
   }
   if (FastMode) {
     func.close();
-    func2.close();
   }
   if (is_bc)
     OKF("Max constraint id is %d", CidCounter);
