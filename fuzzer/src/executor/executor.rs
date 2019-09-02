@@ -11,6 +11,8 @@ use std::{
     collections::HashMap,
     path::Path,
     process::{Command, Stdio},
+    fs::{OpenOptions}, 
+    io::Write,
     sync::{
         atomic::{compiler_fence, Ordering},
         Arc, RwLock,
@@ -34,6 +36,8 @@ pub struct Executor {
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
     pub num_fuzzed : u32,
+    pub func_rel_map : HashMap<String, HashMap<String, u32>>,
+    pub func_cmp_map : HashMap<String, Vec<u32>>,
 }
 
 impl Executor {
@@ -42,6 +46,8 @@ impl Executor {
         global_branches: Arc<branches::GlobalBranches>,
         depot: Arc<depot::Depot>,
         global_stats: Arc<RwLock<stats::ChartStats>>,
+        func_rel_map : HashMap<String, HashMap<String, u32>>,
+        func_cmp_map : HashMap<String, Vec<u32>>,
     ) -> Self {
         // ** Share Memory **
         let branches = branches::Branches::new(global_branches);
@@ -99,6 +105,8 @@ impl Executor {
             global_stats,
             local_stats: Default::default(),
             num_fuzzed : 0,
+            func_rel_map : func_rel_map,
+            func_cmp_map : func_cmp_map,
         }
     }
 
@@ -256,7 +264,9 @@ impl Executor {
                 if !crash_or_tmout {
                     let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
-                        self.depot.add_entries(cond_stmts);
+                        self.depot.add_entries(cond_stmts.clone());
+                        let funclist = self.get_func(cond_stmts);
+                        self.record_rel(funclist);
                         if self.cmd.enable_afl {
                             self.depot
                                 .add_entries(vec![cond_stmt::CondStmt::get_afl_cond(
@@ -443,13 +453,11 @@ impl Executor {
         ret
     }
     
-    pub fn get_func(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>, input_path : &Path) -> Vec<String>{
-      let buf = depot::file::read_from_file(input_path);
-      let cond_list = self.track(0 , &buf, 0);  //id, speed doesn't matter
+    pub fn get_func(&mut self, cond_list : Vec<cond_stmt::CondStmt>) -> Vec<String>{
       let mut func_list = vec![];
       for c in cond_list{
         let mut found = false;
-        for (funcname, cmplist) in func_cmp_map{
+        for (funcname, cmplist) in &self.func_cmp_map{
           for cmpi in cmplist {
             if *cmpi == c.base.cmpid {
               func_list.push(funcname.clone());
@@ -462,7 +470,17 @@ impl Executor {
           }
         }
       }
+      func_list.dedup();
+      func_list.sort_unstable();
       func_list
+    }
+
+    pub fn record_rel(&mut self, funclist : Vec<String>){
+      for f1 in &funclist{
+        for f2 in &funclist{
+          *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
+        }
+      }
     }
 
     pub fn update_log(&mut self) {
@@ -482,4 +500,30 @@ impl Executor {
         self.invariable_cnt = 0;
         self.last_f = defs::UNREACHABLE;
     }
+}
+
+impl Drop for Executor {
+  fn drop(&mut self) {
+    if self.func_rel_map.len() == 0 { return;}
+    info!("dump func rel ..");
+    let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap();
+    let mut rel_all_file = OpenOptions::new().write(true).create(true)
+                    .open(rel_path.join("rel_all.csv")).expect("can't open rel_all_file");
+    if let Err(_) = write!(rel_all_file, ",") {eprintln!("can't write in rel_all.csv");}
+    let mut func_list = Vec::<String>::new();
+    for (f1, _rel1) in self.func_rel_map.iter() {
+      func_list.push(f1.clone());
+    }
+    for f1 in &func_list {
+      if let Err(_) = write!(rel_all_file, "{},", f1) {eprintln!("can't write 1")}
+    }
+    if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
+    for f1 in &func_list {
+      if let Err(_) = write!(rel_all_file, "{},", f1) {eprintln!("can't write 1")}
+      for f2 in &func_list {
+        if let Err(_) = write!(rel_all_file, "{},", self.func_rel_map.get(f1).unwrap().get(f2).unwrap()) {eprintln!("can't write 1")}
+      }
+      if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
+    }
+  }
 }

@@ -197,8 +197,8 @@ impl NextState for CondStmt {
            rel_list.push((k.clone(), *v));
            if *k == cmp_func { target_runs = *v;}
         }
-        //rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
-        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) <= 0.2 );
+        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
+        //rel_list.retain(|x| (x.1 as f64 / target_runs as f64) <= 0.2 );
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);

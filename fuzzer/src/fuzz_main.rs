@@ -67,6 +67,8 @@ pub fn fuzz_main(
         global_branches.clone(),
         depot.clone(),
         stats.clone(),
+        HashMap::new(),
+        HashMap::new(),
     );
 
     //put seed in the queue
