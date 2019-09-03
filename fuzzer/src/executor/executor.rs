@@ -8,7 +8,7 @@ use crate::{
 use angora_common::{config, defs};
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::Path,
     process::{Command, Stdio},
     fs::{OpenOptions}, 
@@ -38,6 +38,7 @@ pub struct Executor {
     pub num_fuzzed : u32,
     pub func_rel_map : HashMap<String, HashMap<String, u32>>,
     pub func_cmp_map : HashMap<String, Vec<u32>>,
+    pub rel_rec_set : HashSet<usize>,
 }
 
 impl Executor {
@@ -107,6 +108,7 @@ impl Executor {
             num_fuzzed : 0,
             func_rel_map : func_rel_map,
             func_cmp_map : func_cmp_map,
+            rel_rec_set : HashSet::new(),
         }
     }
 
@@ -265,8 +267,11 @@ impl Executor {
                     let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
                         self.depot.add_entries(cond_stmts.clone());
-                        let funclist = self.get_func(cond_stmts);
-                        self.record_rel(funclist);
+                        if !self.rel_rec_set.contains(&id) && (self.func_rel_map.len() != 0) {
+                          let funclist = self.get_func(cond_stmts);
+                          self.record_rel(funclist);
+                          self.rel_rec_set.insert(id);
+                        }
                         if self.cmd.enable_afl {
                             self.depot
                                 .add_entries(vec![cond_stmt::CondStmt::get_afl_cond(
@@ -470,8 +475,8 @@ impl Executor {
           }
         }
       }
-      func_list.dedup();
       func_list.sort_unstable();
+      func_list.dedup();
       func_list
     }
 

@@ -171,7 +171,7 @@ impl Depot {
       *rec_idx += 1;
       let mut log_file = OpenOptions::new().write(true).create(true)
                             .open(log_file_name).expect("can't open conds log");
-      let firstline = format!("cmpid,context,belong,condition,state,# of offsets,total offset len,#belongs,fuzz_times,priority");
+      let firstline = format!("cmpid,context,belong,condition,state,# of offsets,total offset len,#belongs,fuzz_times,priority,extended_size, extended_size_rel");
       if let Err(_) = writeln!(log_file, "{}", firstline) {eprintln!("can't write condslog");}
       let q = match self.queue.lock() { Ok(g) => g, Err(p) => { p.into_inner()}};
       let iter = q.iter();

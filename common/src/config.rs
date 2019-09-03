@@ -54,4 +54,4 @@ pub const FUNC_REL_NUM : usize = 0;
 pub const FUNC_REL_RATIO : f64 = 0.3;
 pub const FUNC_REL_THRESHOLD : f64 = 0.8;
 pub const INPUT_FUZZ_MAX_TIME : usize = 10;
-pub const DEBUG_IO : bool = false;
+pub const DEBUG_IO : bool = true;
