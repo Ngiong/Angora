@@ -155,6 +155,7 @@ impl NextState for CondStmt {
     }
     
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
+        if !config::REL_MODE_HIGH { return; }
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
         if func_cmp_map.len() == 0 {return ; }
@@ -197,8 +198,11 @@ impl NextState for CondStmt {
            rel_list.push((k.clone(), *v));
            if *k == cmp_func { target_runs = *v;}
         }
-        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
-        //rel_list.retain(|x| (x.1 as f64 / target_runs as f64) <= 0.2 );
+        if config::REL_MODE_HIGH {
+          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
+        } else {
+          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) <= 0.2 );
+        }
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
