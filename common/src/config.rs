@@ -55,4 +55,5 @@ pub const FUNC_REL_RATIO : f64 = 0.3;
 pub const FUNC_REL_THRESHOLD : f64 = 0.8;
 pub const INPUT_FUZZ_MAX_TIME : usize = 10;
 pub const DEBUG_IO : bool = true;
-pub const REL_MODE_HIGH : bool = true;
+pub const REL_MODE_HIGH : bool = false;
+pub const FUNC_REL_LOW_THRESHOLD : f64 = 0.4;
