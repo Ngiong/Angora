@@ -155,9 +155,9 @@ impl NextState for CondStmt {
     }
     
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
-        if !config::REL_MODE_HIGH { return; }
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
+        if !config::REL_MODE_HIGH { return; }
         if func_cmp_map.len() == 0 {return ; }
         let mut cmp_list : Vec<u32> = Vec::new();
         //get function which contain target cmp
