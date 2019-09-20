@@ -193,15 +193,17 @@ impl NextState for CondStmt {
         //get cmp list of rel func
         let rels : &HashMap<String, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
         let mut rel_list : Vec<(String, u32)> = Vec::new();
-        let mut target_runs = 0;
         for (k, v) in rels{
            rel_list.push((k.clone(), *v));
-           if *k == cmp_func { target_runs = *v;}
         }
+        rel_list.retain(|x| x.1 > 0);
+        let numOfFunc = rel_list.len();
         if config::REL_MODE_HIGH {
-          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_THRESHOLD);
+          rel_list.sort_unstable_by(|x, y| ( y.1.partial_cmp(&x.1).unwrap()));
+          rel_list.split_off((numOfFunc as f64* config::FUNC_REL_THRESHOLD) as usize);
         } else {
-          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) <= config::FUNC_REL_LOW_THRESHOLD );
+          rel_list.sort_unstable_by(|x, y| ( x.1.partial_cmp(&y.1).unwrap()));
+          rel_list.split_off((numOfFunc as f64* config::FUNC_REL_LOW_THRESHOLD) as usize);
         }
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
