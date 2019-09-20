@@ -157,7 +157,7 @@ impl NextState for CondStmt {
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
-        if !config::REL_MODE_HIGH { return; }
+        if !config::REL_ALL && !config::REL_HIGH { return; }
         if func_cmp_map.len() == 0 {return ; }
         let mut cmp_list : Vec<u32> = Vec::new();
         //get function which contain target cmp
@@ -193,17 +193,29 @@ impl NextState for CondStmt {
         //get cmp list of rel func
         let rels : &HashMap<String, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
         let mut rel_list : Vec<(String, u32)> = Vec::new();
+        let mut target_runs = 0;
         for (k, v) in rels{
            rel_list.push((k.clone(), *v));
+           if *k == cmp_func { target_runs = *v;}
         }
         rel_list.retain(|x| x.1 > 0);
-        let num_of_func = rel_list.len();
-        if config::REL_MODE_HIGH {
-          rel_list.sort_unstable_by(|x, y| ( y.1.partial_cmp(&x.1).unwrap()));
-          rel_list.split_off((num_of_func as f64* config::FUNC_REL_THRESHOLD) as usize);
-        } else {
-          rel_list.sort_unstable_by(|x, y| ( x.1.partial_cmp(&y.1).unwrap()));
-          rel_list.split_off((num_of_func as f64* config::FUNC_REL_LOW_THRESHOLD) as usize);
+        if !config::REL_ALL{
+          if config::REL_REL{
+            let num_of_func = rel_list.len();
+            if config::REL_HIGH {
+              rel_list.sort_unstable_by(|x, y| ( y.1.partial_cmp(&x.1).unwrap()));
+              rel_list.split_off((num_of_func as f64* config::FUNC_REL_HIGH_THRESHOLD) as usize);
+            } else {
+              rel_list.sort_unstable_by(|x, y| ( x.1.partial_cmp(&y.1).unwrap()));
+              rel_list.split_off((num_of_func as f64* config::FUNC_REL_LOW_THRESHOLD) as usize);
+            }
+          } else { //retain with absolute threshold
+            if config::REL_HIGH {
+              rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+            } else {
+              rel_list.retain(|x| (x.1 as f64 / target_runs as f64) < config::FUNC_REL_LOW_THRESHOLD);
+            }
+          }
         }
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
