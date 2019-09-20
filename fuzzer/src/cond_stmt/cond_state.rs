@@ -197,13 +197,13 @@ impl NextState for CondStmt {
            rel_list.push((k.clone(), *v));
         }
         rel_list.retain(|x| x.1 > 0);
-        let numOfFunc = rel_list.len();
+        let num_of_func = rel_list.len();
         if config::REL_MODE_HIGH {
           rel_list.sort_unstable_by(|x, y| ( y.1.partial_cmp(&x.1).unwrap()));
-          rel_list.split_off((numOfFunc as f64* config::FUNC_REL_THRESHOLD) as usize);
+          rel_list.split_off((num_of_func as f64* config::FUNC_REL_THRESHOLD) as usize);
         } else {
           rel_list.sort_unstable_by(|x, y| ( x.1.partial_cmp(&y.1).unwrap()));
-          rel_list.split_off((numOfFunc as f64* config::FUNC_REL_LOW_THRESHOLD) as usize);
+          rel_list.split_off((num_of_func as f64* config::FUNC_REL_LOW_THRESHOLD) as usize);
         }
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();

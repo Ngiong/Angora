@@ -279,7 +279,7 @@ fn main_thread_sync_and_log(
     if sync_afl {
         depot::sync_afl(executor, running.clone(), sync_dir, &mut synced_ids);
     }
-    if let Err(_) = writeln!(log_file, "time,density,queue,hang,crash,normal,normal_end,one_byte,det,timeout,unsolvable,func,funcrel") {
+    if let Err(_) = writeln!(log_file, "time,density,queue,hang,crash,exec_time,normal,normal_end,one_byte,det,timeout,unsolvable,func,funcrel") {
       eprintln!("can't write angora.log"); }
     let mut sync_counter = 1;
     show_stats(&mut log_file, depot, global_branches, stats);
