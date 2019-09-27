@@ -56,6 +56,7 @@ pub fn fuzz_main(
 
     let func_cmp_map = get_func_cmp_map (func_cmp_map); 
 
+    record_parameter(&angora_out_dir, &command_option, in_dir);
     let stats = Arc::new(RwLock::new(stats::ChartStats::new(&track_target ,&out_dir, func_cmp_map.len() != 0)));
     let global_branches = Arc::new(branches::GlobalBranches::new());  //To record global path coverage (edge cov?)
     let fuzzer_stats = create_stats_file_and_write_pid(&angora_out_dir);
@@ -205,6 +206,23 @@ fn set_sigint_handler(r: Arc<AtomicBool>) {
         r.store(false, Ordering::SeqCst);
     })
     .expect("Error setting SIGINT handler!");
+}
+
+fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : &str) {
+  let fuzz_param = out_dir.join("parameters");
+  let mut buff = match fs::File::create(&fuzz_param) {
+    Ok(a) => a,
+    Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
+  };
+  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}",
+               out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0)
+         .expect("Could not write to param file");
+  for s in &command.main.1{
+    write!(buff," {}", s).expect("Could not write to param file");
+  }
+  write!(buff, ", MAP_SIZE : {}, ALL : {}, REL : {}, HIGH : {}, H_THRESHOLD: {}, L_THRESHOLD: {}",
+         config::MAP_SIZE_POW2, config::REL_ALL, config::REL_REL, config::REL_HIGH,
+         config::FUNC_REL_HIGH_THRESHOLD, config::FUNC_REL_LOW_THRESHOLD).expect("Could not write to param file");
 }
 
 fn create_stats_file_and_write_pid(angora_out_dir: &PathBuf) -> PathBuf {

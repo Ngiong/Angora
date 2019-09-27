@@ -34,3 +34,7 @@ llvm_mode/build/
 /gcov/
 /inputs/
 *.gcov
+/0925/
+/run.sh
+/run2.sh
+
