@@ -220,8 +220,8 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
   for s in &command.main.1{
     write!(buff," {}", s).expect("Could not write to param file");
   }
-  write!(buff, ", MAP_SIZE : {}, ALL : {}, REL : {}, HIGH : {}, H_THRESHOLD: {}, L_THRESHOLD: {}",
-         config::MAP_SIZE_POW2, config::REL_ALL, config::REL_REL, config::REL_HIGH,
+  write!(buff, ", MAP_SIZE : {}, ALL : {}, HIGH : {}, H_THRESHOLD: {}, L_THRESHOLD: {}",
+         config::MAP_SIZE_POW2, config::REL_ALL, config::REL_HIGH,
          config::FUNC_REL_HIGH_THRESHOLD, config::FUNC_REL_LOW_THRESHOLD).expect("Could not write to param file");
 }
 

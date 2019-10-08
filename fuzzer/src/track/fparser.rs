@@ -131,6 +131,9 @@ pub fn load_track_data(
 
     for cond in cond_list.iter_mut() {
         cond.base.belong = id;
+        if cond.offsets.len() > 0 {
+          cond.belongs.push((id, 0, cond.offsets.clone()), 0);
+        }
         cond.speed = speed;
         if cond.offsets.len() == 1 && cond.offsets[0].end - cond.offsets[0].begin == 1 {
             cond.state = CondState::OneByte;

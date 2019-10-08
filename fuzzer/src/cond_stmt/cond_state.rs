@@ -53,6 +53,13 @@ impl CondState {
         }
     }
 
+    pub fn is_end(&self) -> bool {
+        match self {
+           CondState::OffsetAllEnd => true,
+           _ => false,
+        }
+    }
+
     pub fn is_unsolvable(&self) -> bool {
         match self {
             CondState::Unsolvable => true,
@@ -86,20 +93,26 @@ impl fmt::Display for CondState {
 }
 
 pub trait NextState {
-    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>, func_rel_map : &HashMap<String, HashMap<String, u32>>);
-
+    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                    func_rel_map : &HashMap<String, HashMap<String, u32>>);
     fn to_offsets_opt(&mut self);
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
     fn to_det(&mut self);
     fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>);
-    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>, func_rel_map : &HashMap<String, HashMap<String, u32>>);
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                                      func_rel_map : &HashMap<String, HashMap<String, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
+    fn to_next_input(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                               func_rel_map : &HashMap<String, HashMap<String,u32>>);
+    fn belongs_prioritize(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                               func_rel_map : &HashMap<String, HashMap<String,u32>>);
 }
 
 impl NextState for CondStmt {
-    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>, func_rel_map : &HashMap<String, HashMap<String, u32>>) {
+    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                             func_rel_map : &HashMap<String, HashMap<String, u32>>) {
         match self.state {
             CondState::Offset => {
                 if self.offsets_opt.len() > 0 {
@@ -130,6 +143,9 @@ impl NextState for CondStmt {
             },
             CondState::OffsetRelFunc => {
                 self.to_offsets_all_end();
+            },
+            CondState::OffsetAllEnd => {
+                self.to_next_input(depot, func_cmp_map, func_rel_map);
             },
             _ => {},
         }
@@ -178,7 +194,80 @@ impl NextState for CondStmt {
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         self.ext_offset_size = after_size - before_size;
     }
-    
+   
+    fn to_next_input (&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                                      func_rel_map : &HashMap<String, HashMap<String, u32>>) {
+      let new_belong = match self.belongs.peek(){
+        Some((_, 0)) => {
+          self.belongs_prioritize(depot, func_cmp_map, func_rel_map);
+          self.belongs.peek().expect("can't get belongs").0.clone()
+        },
+        Some ((b, _)) => {b.clone()},
+        None => {(0,0,vec![])},
+      };
+      if new_belong.2.len() == 0 { return; }
+      self.belongs.change_priority(&new_belong, 0);
+      self.base.belong = new_belong.0;
+      self.offsets = new_belong.2.clone();
+    }
+
+    fn belongs_prioritize(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+                               func_rel_map : &HashMap<String, HashMap<String,u32>>) {
+      let mut cmp_list : Vec<u32> = Vec::new();
+      let mut cmp_func : String = String::new();
+      //get func which contains the cmp.
+      for (k, v) in func_cmp_map {
+        if v.contains(&self.base.cmpid) {cmp_func = k.clone(); break; }
+      }
+      //get cmp list of rel func
+      let rels : &HashMap<String, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
+      let mut rel_list : Vec<(String, u32)> = Vec::new();
+      let mut target_runs = 0;
+      for (k, v) in rels{
+         rel_list.push((k.clone(), *v));
+         if *k == cmp_func { target_runs = *v;}
+      }
+      rel_list.retain(|x| x.1 > 0);
+      if !config::REL_ALL{
+        if config::REL_HIGH {
+          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+        } else {
+          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) < config::FUNC_REL_LOW_THRESHOLD);
+        }
+      }
+      for (rel_func, _rel) in rel_list {
+        let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
+        cmp_list.append(&mut rel_cmp_list);
+      }
+      for ( old_belong, p) in self.belongs.iter_mut(){
+        if old_belong.1 == 0 {
+          let mut new_offset = vec![];
+          let q = match depot.queue.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
+          };
+          for (i, _) in q.iter(){
+            if cmp_list.contains(&i.base.cmpid) {
+              if old_belong.0 == i.base.belong {
+                new_offset = merge_offsets(&new_offset, &i.offsets);
+                new_offset = merge_offsets(&new_offset, &i.offsets_opt);
+              };
+              for ((bid2,_, boffset2), _) in i.belongs.iter(){
+                if *bid2 == old_belong.0 {
+                  new_offset = merge_offsets(&new_offset, &boffset2);
+                  break;
+                }
+              }
+            }
+          };
+          new_offset = merge_offsets(&new_offset, &old_belong.2);
+          old_belong.2 = new_offset;
+          old_belong.1 = old_belong.2.len() as u32;
+        };
+        *p = old_belong.1;
+      }
+    }
+ 
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
@@ -200,21 +289,10 @@ impl NextState for CondStmt {
         }
         rel_list.retain(|x| x.1 > 0);
         if !config::REL_ALL{
-          if config::REL_REL{
-            let num_of_func = rel_list.len();
-            if config::REL_HIGH {
-              rel_list.sort_unstable_by(|x, y| ( y.1.partial_cmp(&x.1).unwrap()));
-              rel_list.split_off((num_of_func as f64* config::FUNC_REL_HIGH_THRESHOLD) as usize);
-            } else {
-              rel_list.sort_unstable_by(|x, y| ( x.1.partial_cmp(&y.1).unwrap()));
-              rel_list.split_off((num_of_func as f64* config::FUNC_REL_LOW_THRESHOLD) as usize);
-            }
-          } else { //retain with absolute threshold
-            if config::REL_HIGH {
-              rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
-            } else {
-              rel_list.retain(|x| (x.1 as f64 / target_runs as f64) < config::FUNC_REL_LOW_THRESHOLD);
-            }
+          if config::REL_HIGH {
+            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+          } else {
+            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) < config::FUNC_REL_LOW_THRESHOLD);
           }
         }
         for (rel_func, _rel) in rel_list {
@@ -225,8 +303,7 @@ impl NextState for CondStmt {
             Ok(guard) => guard,
             Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
         };
-        let iter = q.iter();
-        for (i, _p) in iter{
+        for (i, _p) in q.iter() {
           if self.base.belong != i.base.belong {continue;}
           if cmp_list.contains(&i.base.cmpid) {
             self.offsets = merge_offsets(&self.offsets, &i.offsets);

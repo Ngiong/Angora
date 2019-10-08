@@ -2,6 +2,7 @@ use super::CondState;
 use crate::fuzz_type::FuzzType;
 use angora_common::{cond_stmt_base::CondStmtBase, defs, tag::TagSeg};
 use std::hash::{Hash, Hasher};
+use priority_queue::PriorityQueue;
 
 #[derive(Debug, Default, Clone)]
 pub struct CondStmt {
@@ -17,8 +18,7 @@ pub struct CondStmt {
     pub state: CondState,
     pub num_minimal_optima: usize,
     pub linear: bool,
-
-    pub belongs : Vec<(u32,Vec<TagSeg>)>, // (input id, offset)
+    pub belongs : PriorityQueue<(u32, u32, Vec<TagSeg>), u32>, // (input id, basic_priority, offset)
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
 }
@@ -54,7 +54,7 @@ impl CondStmt {
             state: CondState::default(),
             num_minimal_optima: 0,
             linear: false,
-            belongs : vec![],
+            belongs : PriorityQueue::new(),
             ext_offset_size : 0,
             ext_offset_size_rel : 0,
         }
@@ -146,19 +146,4 @@ impl CondStmt {
         self.base.is_done()
     }
 
-    pub fn append_input(&mut self, cond : &mut CondStmt){
-      if cond.offsets.len() != 0 {
-        self.belongs.push((cond.base.belong, cond.offsets.clone()));
-      }
-      self.belongs.append(&mut cond.belongs);
-    }
-
-    pub fn next_input(&mut self){
-      if self.belongs.len() > 0 {
-        self.belongs.push((self.base.belong, self.offsets.clone()));
-        let (new_input, new_off) = self.belongs.remove(0);
-        self.base.belong = new_input;
-        self.offsets = new_off.clone();
-      }
-    }
 }
