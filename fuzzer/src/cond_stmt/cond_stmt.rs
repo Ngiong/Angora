@@ -1,5 +1,6 @@
 use super::CondState;
 use crate::fuzz_type::FuzzType;
+use crate::depot::qpriority::QPriority;
 use angora_common::{cond_stmt_base::CondStmtBase, defs, tag::TagSeg};
 use std::hash::{Hash, Hasher};
 use priority_queue::PriorityQueue;
@@ -18,7 +19,7 @@ pub struct CondStmt {
     pub state: CondState,
     pub num_minimal_optima: usize,
     pub linear: bool,
-    pub belongs : PriorityQueue<(u32, u32, Vec<TagSeg>), u32>, // (input id, basic_priority, offset)
+    pub belongs : PriorityQueue<(u32, u16, Vec<TagSeg>), QPriority>, // (input id, basic_priority, offset)
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
 }

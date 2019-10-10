@@ -1,4 +1,4 @@
-use crate::{cond_stmt::CondStmt, mut_input::offsets::*};
+use crate::{cond_stmt::CondStmt, mut_input::offsets::*, depot::qpriority::QPriority};
 use std::fmt;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -198,7 +198,7 @@ impl NextState for CondStmt {
     fn to_next_input (&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>) {
       let new_belong = match self.belongs.peek(){
-        Some((_, 0)) => {
+        Some((_, p)) if p.is_done() => {
           self.belongs_prioritize(depot, func_cmp_map, func_rel_map);
           self.belongs.peek().expect("can't get belongs").0.clone()
         },
@@ -206,7 +206,7 @@ impl NextState for CondStmt {
         None => {(0,0,vec![])},
       };
       if new_belong.2.len() == 0 { return; }
-      self.belongs.change_priority(&new_belong, 0);
+      self.belongs.change_priority(&new_belong, QPriority::done());
       self.base.belong = new_belong.0;
       self.offsets = new_belong.2.clone();
     }
@@ -262,9 +262,11 @@ impl NextState for CondStmt {
           };
           new_offset = merge_offsets(&new_offset, &old_belong.2);
           old_belong.2 = new_offset;
-          old_belong.1 = old_belong.2.len() as u32;
+          old_belong.1 = old_belong.2.len() as u16;
         };
-        *p = old_belong.1;
+        if old_belong.1 != 0 {
+          *p = QPriority(old_belong.1);
+        };
       }
     }
  
