@@ -21,7 +21,7 @@ pub const TIME_LIMIT: u64 = 1;
 pub const MEM_LIMIT: u64 = 200; // MB
 pub const TIME_LIMIT_TRACK: u64 = 12;
 pub const MEM_LIMIT_TRACK: u64 = 0;
-pub const LONG_FUZZ_TIME: usize = 8;
+pub const LONG_FUZZ_TIME: usize = 1; //8;
 pub const MAX_INVARIABLE_NUM: usize = 16;
 pub const MAX_NUM_MINIMAL_OPTIMA_ALL: usize = 28;
 // based the bit bucket: [1], [2], [3], [4, 7], [8, 15], [16, 31], [32, 127], [128, infinity]

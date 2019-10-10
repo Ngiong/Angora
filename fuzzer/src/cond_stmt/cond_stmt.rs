@@ -145,5 +145,11 @@ impl CondStmt {
     pub fn is_done(&self) -> bool {
         self.base.is_done()
     }
-
+    pub fn dump_belongs(&self) -> String {
+      let mut ret = String::new();
+      for (b, p ) in self.belongs.iter(){
+         ret.push_str(&format!("(({}, {}, {}), {}), ",b.0,b.1, b.2.len(), p));
+      };
+      ret
+    }
 }
