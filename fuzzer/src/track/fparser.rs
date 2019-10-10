@@ -4,7 +4,6 @@ use super::load_pin_data::get_log_data_pin;
 use angora_common::config;
 use crate::{
     cond_stmt::{CondState, CondStmt},
-    depot::qpriority::QPriority,
     mut_input,
 };
 use angora_common::{defs, tag::TagSeg};
@@ -129,11 +128,15 @@ pub fn load_track_data(
             }
     }
     }
+    let mut cid_list = vec![];
+    for cond in cond_list.iter() {
+      cid_list.push(cond.base.cmpid);
+    }
 
     for cond in cond_list.iter_mut() {
         cond.base.belong = id;
         if cond.offsets.len() > 0 {
-          cond.belongs.push((id, 0, cond.offsets.clone()), QPriority::done());
+          cond.belongs.push((id, 0, cond.offsets.clone(), cid_list.clone()), 0);
         }
         cond.speed = speed;
         if cond.offsets.len() == 1 && cond.offsets[0].end - cond.offsets[0].begin == 1 {

@@ -1,6 +1,5 @@
 use super::CondState;
 use crate::fuzz_type::FuzzType;
-use crate::depot::qpriority::QPriority;
 use angora_common::{cond_stmt_base::CondStmtBase, defs, tag::TagSeg};
 use std::hash::{Hash, Hasher};
 use priority_queue::PriorityQueue;
@@ -16,10 +15,11 @@ pub struct CondStmt {
     pub is_desirable: bool, // non-convex
     pub is_consistent: bool,
     pub fuzz_times: usize,
+    pub cur_fuzz_times : usize,
     pub state: CondState,
     pub num_minimal_optima: usize,
     pub linear: bool,
-    pub belongs : PriorityQueue<(u32, u16, Vec<TagSeg>), QPriority>, // (input id, basic_priority, offset)
+    pub belongs : PriorityQueue<(u32, u32, Vec<TagSeg>, Vec<u32>), u32>, // (input id, basic_priority, offset)
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
 }
@@ -52,6 +52,7 @@ impl CondStmt {
             is_consistent: true,
             is_desirable: true,
             fuzz_times: 0,
+            cur_fuzz_times : 0,
             state: CondState::default(),
             num_minimal_optima: 0,
             linear: false,
@@ -149,7 +150,7 @@ impl CondStmt {
     pub fn dump_belongs(&self) -> String {
       let mut ret = String::new();
       for (b, p ) in self.belongs.iter(){
-         ret.push_str(&format!("(({}, {}, {}), {}), ",b.0,b.1, b.2.len(), p));
+         ret.push_str(&format!("(({}, {}, {}, {}), {}), ",b.0,b.1, b.2.len(), b.3.len(), p));
       };
       ret
     }

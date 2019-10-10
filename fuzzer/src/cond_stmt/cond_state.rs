@@ -1,4 +1,4 @@
-use crate::{cond_stmt::CondStmt, mut_input::offsets::*, depot::qpriority::QPriority};
+use crate::{cond_stmt::CondStmt, mut_input::offsets::*};
 use std::fmt;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -30,7 +30,7 @@ impl Default for CondState {
 impl CondStmt {
     pub fn is_time_expired(&self) -> bool {
         ((self.state.is_det() || self.state.is_one_byte()) && !self.is_first_time())
-            || self.fuzz_times >= config::LONG_FUZZ_TIME
+            || self.cur_fuzz_times >= config::LONG_FUZZ_TIME
     }
 }
 
@@ -104,9 +104,9 @@ pub trait NextState {
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
-    fn to_next_input(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+    fn to_next_input(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
                                func_rel_map : &HashMap<String, HashMap<String,u32>>);
-    fn belongs_prioritize(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+    fn belongs_prioritize(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
                                func_rel_map : &HashMap<String, HashMap<String,u32>>);
 }
 
@@ -145,7 +145,7 @@ impl NextState for CondStmt {
                 self.to_offsets_all_end();
             },
             CondState::OffsetAllEnd => {
-                self.to_next_input(depot, func_cmp_map, func_rel_map);
+                self.to_next_input(func_cmp_map, func_rel_map);
             },
             _ => {},
         }
@@ -195,23 +195,25 @@ impl NextState for CondStmt {
         self.ext_offset_size = after_size - before_size;
     }
    
-    fn to_next_input (&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+    fn to_next_input (&mut self,func_cmp_map : &HashMap<String, Vec<u32>>,
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>) {
       let new_belong = match self.belongs.peek(){
-        Some((_, p)) if p.is_done() => {
-          self.belongs_prioritize(depot, func_cmp_map, func_rel_map);
+        Some((_, 0))  => {
+          self.belongs_prioritize(func_cmp_map, func_rel_map);
           self.belongs.peek().expect("can't get belongs").0.clone()
         },
         Some ((b, _)) => {b.clone()},
-        None => {(0,0,vec![])},
+        None => {(0,0,vec![], vec![])},
       };
       if new_belong.2.len() == 0 { return; }
-      self.belongs.change_priority(&new_belong, QPriority::done());
+      self.belongs.change_priority(&new_belong, 0);
       self.base.belong = new_belong.0;
       self.offsets = new_belong.2.clone();
+      self.cur_fuzz_times = 0;
+      self.state = CondState::Offset;
     }
 
-    fn belongs_prioritize(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
+    fn belongs_prioritize(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
                                func_rel_map : &HashMap<String, HashMap<String,u32>>) {
       let mut cmp_list : Vec<u32> = Vec::new();
       let mut cmp_func : String = String::new();
@@ -239,34 +241,13 @@ impl NextState for CondStmt {
         let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
         cmp_list.append(&mut rel_cmp_list);
       }
-      for ( old_belong, p) in self.belongs.iter_mut(){
+      for (old_belong, p) in self.belongs.iter_mut(){
         if old_belong.1 == 0 {
-          let mut new_offset = vec![];
-          let q = match depot.queue.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
-          };
-          for (i, _) in q.iter(){
-            if cmp_list.contains(&i.base.cmpid) {
-              if old_belong.0 == i.base.belong {
-                new_offset = merge_offsets(&new_offset, &i.offsets);
-                new_offset = merge_offsets(&new_offset, &i.offsets_opt);
-              };
-              for ((bid2,_, boffset2), _) in i.belongs.iter(){
-                if *bid2 == old_belong.0 {
-                  new_offset = merge_offsets(&new_offset, &boffset2);
-                  break;
-                }
-              }
-            }
-          };
-          new_offset = merge_offsets(&new_offset, &old_belong.2);
-          old_belong.2 = new_offset;
-          old_belong.1 = old_belong.2.len() as u16;
+          let mut common_list = cmp_list.clone();
+          common_list.retain(|x| old_belong.3.contains(&x));
+          old_belong.1 = ((common_list.len() as f32) / (old_belong.3.len() as f32) * 1000.0) as u32;
         };
-        if old_belong.1 != 0 {
-          *p = QPriority(old_belong.1);
-        };
+        *p = old_belong.1;
       }
     }
  

@@ -20,6 +20,7 @@ impl<'a> SearchHandler<'a> {
         executor.local_stats.register(cond);
         executor.num_fuzzed = executor.num_fuzzed + 1;
         cond.fuzz_times = cond.fuzz_times + 1;
+        cond.cur_fuzz_times = cond.cur_fuzz_times + 1;
         Self {
             running,
             executor,
