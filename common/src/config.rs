@@ -46,7 +46,7 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 
 //Cheong
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 3;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
 pub const FUNC_CHOOSE_LOOP_MAX : u32 = 40;
 pub const FUNC_TARGET_NUMBER_OF_COND : u32 = 20;
 pub const FUNC_TARGET_PRIORITY_THREASHOLD : u16 = 10;

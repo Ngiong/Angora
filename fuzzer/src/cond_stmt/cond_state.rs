@@ -282,17 +282,19 @@ impl NextState for CondStmt {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
         }
+        let mut new_offset = vec![];
         let q = match depot.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
         };
         for (i, _p) in q.iter() {
-          if self.base.belong != i.base.belong {continue;}
           if cmp_list.contains(&i.base.cmpid) {
-            self.offsets = merge_offsets(&self.offsets, &i.offsets);
-            self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+            for ((_bid2, _, boffset2,_), _) in i.belongs.iter(){
+              new_offset = merge_offsets(&new_offset, boffset2);
+            }
           }
         }
+        self.offsets = merge_offsets(&self.offsets, &new_offset);
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         self.ext_offset_size_rel = after_size - before_size;
     }
