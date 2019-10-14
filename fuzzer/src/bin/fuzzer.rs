@@ -5,8 +5,11 @@ use clap::{App, Arg};
 extern crate angora;
 extern crate angora_common;
 use angora::fuzz_main;
+use std::thread;
 
-fn main() {
+const STACK_SIZE: usize = 128 * 1024 * 1024;
+
+fn run() {
     let matches = App::new("angora-fuzzer")
         .version(crate_version!())
         .about("Angora is a mutation-based fuzzer. The main goal of Angora is to increase branch coverage by solving path constraints without symbolic execution.")
@@ -102,4 +105,9 @@ fn main() {
         matches.occurrences_of("disable_exploitation") == 0,
         matches.value_of("function_cmp_list"),
     );
+}
+
+fn main() {
+  let ch = thread::Builder::new().stack_size(STACK_SIZE).spawn(run).unwrap();
+  ch.join().unwrap();
 }
