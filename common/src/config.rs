@@ -12,7 +12,7 @@ pub const PREFER_FAST_COND: bool = true;
 pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
-pub const MAP_SIZE_POW2: usize = 21;
+pub const MAP_SIZE_POW2: usize = 20;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -57,7 +57,7 @@ pub const FUNC_REL_HIGH_THRESHOLD : f64 = 0.8;
 pub const FUNC_REL_LOW_THRESHOLD : f64 = 0.2;
 pub const REL_ALL : bool = false;
 pub const REL_HIGH : bool = true;
-pub const PRIORITIZE : bool = true;
-pub const RANDOM_SELECT : bool = false;
-pub const RANDOM_SIZE : usize = 4;
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
+pub const PRIORITIZE : bool = false;
+pub const RANDOM_SELECT : bool = true;
+pub const RANDOM_SIZE : usize = 9;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 3;
