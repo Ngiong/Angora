@@ -217,11 +217,13 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
   write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}",
                out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0)
          .expect("Could not write to param file");
+  writeln!(buff, "").expect("Could not write");
   for s in &command.main.1{
     write!(buff," {}", s).expect("Could not write to param file");
   }
-  write!(buff, ", MAP_SIZE : {}, ALL : {}, HIGH : {}, H_THRESHOLD: {}, L_THRESHOLD: {}",
-         config::MAP_SIZE_POW2, config::REL_ALL, config::REL_HIGH,
+  writeln!(buff,"").expect("Could nout write to param file");
+  write!(buff, ", MAP_SIZE : {}, Random : {}, Prioritize : {}, ALL : {}, HIGH : {}, H_THRESHOLD: {}, L_THRESHOLD: {}",
+         config::MAP_SIZE_POW2, config::RANDOM_SELECT, config::PRIORITIZE, config::REL_ALL, config::REL_HIGH,
          config::FUNC_REL_HIGH_THRESHOLD, config::FUNC_REL_LOW_THRESHOLD).expect("Could not write to param file");
 }
 

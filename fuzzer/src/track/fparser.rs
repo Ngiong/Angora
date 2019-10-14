@@ -135,7 +135,7 @@ pub fn load_track_data(
 
     for cond in cond_list.iter_mut() {
         cond.base.belong = id;
-        if cond.offsets.len() > 0 {
+        if config::PRIORITIZE && cond.offsets.len() > 0 {
           cond.belongs.push((id, 0, cond.offsets.clone(), cid_list.clone()), 0);
         }
         cond.speed = speed;

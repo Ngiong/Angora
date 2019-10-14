@@ -1,0 +1,10 @@
+base64, 20M, ./bas364 -d @@, random : B, 3H
+uniq, 20M, ./uniq @@, random : B, 3H
+md5sum, 20M, ./md5sum -C ?  @@ , 3H, random : B
+who, 20M, ./who @@, 24H, random : B, -M 0
+jhead, 20M, ./jhead @@, 24H, random : B,
+xmlwf, 20M, ./xmlwf @@, 24H, random : 5B
+tcpdump, 21M, ./tcpdump -ee -vv -nnr @@, 24H, random : 6B,
+file, 21M, ./file @@, 24H, random : B,
+size, 21M, ./size @@, 72H, random : 8B, -M 0
+objdump, 21M, ./objdump @@, 72H, random : B, -M 0

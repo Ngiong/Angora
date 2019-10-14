@@ -3,7 +3,8 @@ use std::fmt;
 use std::sync::Arc;
 use std::collections::HashMap;
 use crate::depot::Depot;
-use angora_common::{config, defs};
+use angora_common::{config, defs, tag::TagSeg};
+use rand::{thread_rng, Rng};
 use std;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +105,7 @@ pub trait NextState {
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
+    fn random_select(&mut self, depot : &Arc<Depot>);
     fn to_next_input(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
                                func_rel_map : &HashMap<String, HashMap<String,u32>>);
     fn belongs_prioritize(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
@@ -139,7 +141,11 @@ impl NextState for CondStmt {
                 self.to_offsets_func(depot, func_cmp_map);
             },
             CondState::OffsetFunc => {
-                self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
+                if config::RANDOM_SELECT {
+                  self.random_select(depot);
+                } else {
+                  self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
+                }
             },
             CondState::OffsetRelFunc => {
                 self.to_offsets_all_end();
@@ -173,8 +179,8 @@ impl NextState for CondStmt {
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
-        if !config::REL_ALL && !config::REL_HIGH { return; }
-        if func_cmp_map.len() == 0 {return ; }
+        if !config::REL_ALL && !config::REL_HIGH 
+              || config::RANDOM_SELECT || func_cmp_map.len() == 0 { return; }
         let mut cmp_list : Vec<u32> = Vec::new();
         //get function which contain target cmp
         for (_k, v) in func_cmp_map {
@@ -197,6 +203,7 @@ impl NextState for CondStmt {
    
     fn to_next_input (&mut self,func_cmp_map : &HashMap<String, Vec<u32>>,
                                       func_rel_map : &HashMap<String, HashMap<String, u32>>) {
+      if !config::PRIORITIZE { return ; }
       let new_belong = match self.belongs.peek(){
         Some((_, 0))  => {
           self.belongs_prioritize(func_cmp_map, func_rel_map);
@@ -299,6 +306,20 @@ impl NextState for CondStmt {
         self.ext_offset_size_rel = after_size - before_size;
     }
 
+    fn random_select(&mut self, depot : &Arc<Depot>){
+      let mut new_offset = vec![];
+      self.state = CondState::OffsetRelFunc;
+      let before_size = self.get_offset_len() + self.get_offset_opt_len();
+      let buf_len = depot.get_input_buf(self.base.belong as usize).len();
+      for _i in 0..config::RANDOM_SIZE {
+        let random_off :u32 = thread_rng().gen_range(0, buf_len) as u32;
+        let random_byte = vec![TagSeg {sign : false, begin : random_off, end : random_off+1,}];
+        new_offset = merge_offsets(&new_offset, &random_byte);
+      } 
+      self.offsets = merge_offsets(&self.offsets, &new_offset);
+      let after_size = self.get_offset_len() + self.get_offset_opt_len();
+      self.ext_offset_size_rel = after_size - before_size;
+    }
     fn to_unsolvable(&mut self) {
         debug!("to unsovable");
         self.state = CondState::Unsolvable;
