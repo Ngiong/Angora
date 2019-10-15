@@ -138,7 +138,8 @@ impl Executor {
             && cond.state.is_initial()
         {
             cond.is_consistent = false;
-            warn!("inconsistent : {:?}", cond);
+            //warn!("inconsistent : {:?}", cond);
+            warn!("inconsistent : ");
         }
     }
 
