@@ -1,7 +1,5 @@
 #located in LAVA-M
-ANGORA_LOC="${ANGORA_LOC}"
-rm -rf ${ANGORA_LOC}/subjects
-rm -rf ${ANGORA_LOC}/FInfos
+ANGORA_LOC="/home/cheong/Angora_func"
 
 mkdir ${ANGORA_LOC}/subjects
 mkdir ${ANGORA_LOC}/FInfos
@@ -11,7 +9,7 @@ rm base64.*
 make clean
 rm FInfo*
 CC=gclang CFLAGS="-g -O0" ./configure --disable-shared --prefix=`pwd`/lava-install
-make -j
+make -j 10
 cp src/base64 ./
 get-bc base64
 ${ANGORA_LOC}/bin/angora-clang base64.bc -o base64.fast
@@ -22,7 +20,9 @@ rm uniq.*
 make clean
 rm FInfo*
 CC=gclang CFLAGS="-g -O0" ./configure --disable-shared --prefix=`pwd`/lava-install
-make -j
+find . -type f -name "*.h" -exec sed -i 's/#define\s*HAVE_GETC_UNLOCKED\s*[0-9]/#undef HAVE_GETC_UNLOCKED/' {} +
+find . -type f -name "*.h" -exec sed -i 's/#define\s*HAVE_DECL_GETC_UNLOCKED\s*[0-9]/#undef HAVE_GETC_UNLOCKED/' {} +
+make -j 10
 cp src/uniq ./
 get-bc uniq
 ${ANGORA_LOC}/bin/angora-clang uniq.bc -o uniq.fast
@@ -33,7 +33,7 @@ rm md5sum.*
 make clean
 rm FInfo*
 CC=gclang CFLAGS="-g -O0" ./configure --disable-shared --prefix=`pwd`/lava-install
-make -j
+make -j 10
 cp src/md5sum ./
 get-bc md5sum
 ${ANGORA_LOC}/bin/angora-clang md5sum.bc -o md5sum.fast
@@ -44,7 +44,7 @@ rm who.*
 make clean
 rm FInfo*
 CC=gclang CFLAGS="-g -O0" ./configure --disable-shared --prefix=`pwd`/lava-install
-make -j
+make -j 10
 cp src/who ./
 get-bc who
 ${ANGORA_LOC}/bin/angora-clang who.bc -o who.fast
