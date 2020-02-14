@@ -36,9 +36,11 @@ pub struct Executor {
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
     pub num_fuzzed : u32,
-    pub func_rel_map : HashMap<String, HashMap<String, u32>>,
-    pub func_cmp_map : HashMap<String, Vec<u32>>,
+    pub func_rel_map : HashMap<u32, HashMap<u32, u32>>,
+    pub func_cmp_map : HashMap<u32, Vec<u32>>,
+    pub func_id_map : HashMap<u32, String>,
     pub rel_rec_set : HashSet<usize>,
+    pub func_uniq_call_set : HashSet<String>,
 }
 
 impl Executor {
@@ -47,8 +49,9 @@ impl Executor {
         global_branches: Arc<branches::GlobalBranches>,
         depot: Arc<depot::Depot>,
         global_stats: Arc<RwLock<stats::ChartStats>>,
-        func_rel_map : HashMap<String, HashMap<String, u32>>,
-        func_cmp_map : HashMap<String, Vec<u32>>,
+        func_rel_map : HashMap<u32, HashMap<u32, u32>>,
+        func_cmp_map : HashMap<u32, Vec<u32>>,
+        func_id_map : HashMap<u32, String>
     ) -> Self {
         // ** Share Memory **
         let branches = branches::Branches::new(global_branches);
@@ -108,7 +111,9 @@ impl Executor {
             num_fuzzed : 0,
             func_rel_map : func_rel_map,
             func_cmp_map : func_cmp_map,
+            func_id_map : func_id_map,
             rel_rec_set : HashSet::new(),
+            func_uniq_call_set : HashSet::new(),
         }
     }
 
@@ -269,8 +274,7 @@ impl Executor {
                     if cond_stmts.len() > 0 {
                         self.depot.add_entries(cond_stmts.clone());
                         if !self.rel_rec_set.contains(&id) && (self.func_rel_map.len() != 0) {
-                          let funclist = self.get_func(cond_stmts);
-                          self.record_rel(funclist);
+                          self.get_func_and_record(cond_stmts);
                           self.rel_rec_set.insert(id);
                         }
                         if self.cmd.enable_afl {
@@ -459,14 +463,16 @@ impl Executor {
         ret
     }
     
-    pub fn get_func(&mut self, cond_list : Vec<cond_stmt::CondStmt>) -> Vec<String>{
-      let mut func_list = vec![];
+    pub fn get_func_and_record(&mut self, cond_list : Vec<cond_stmt::CondStmt>) {
+      let mut func_set = HashSet::new();
+      let mut maxfuncid = 0;
       for c in cond_list{
         let mut found = false;
-        for (funcname, cmplist) in &self.func_cmp_map{
+        for (funcid, cmplist) in &self.func_cmp_map{
           for cmpi in cmplist {
             if *cmpi == c.base.cmpid {
-              func_list.push(funcname.clone());
+              func_set.insert(*funcid);
+              if maxfuncid < *funcid { maxfuncid = *funcid}
               found = true;
               break;
             }
@@ -476,15 +482,33 @@ impl Executor {
           }
         }
       }
-      func_list.sort_unstable();
-      func_list.dedup();
-      func_list
-    }
 
-    pub fn record_rel(&mut self, funclist : Vec<String>){
-      for f1 in &funclist{
-        for f2 in &funclist{
-          *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
+      //Hashing 
+      if config::FUNC_REL_CHOOSE {
+        let mut hashstring = String::from("1");
+        maxfuncid -= 1;
+        loop {
+          if func_set.contains(&maxfuncid) {
+            hashstring.push('1');
+          } else {
+            hashstring.push('0');
+          }
+          if maxfuncid == 0 { break; }
+          maxfuncid -= 1;
+        }
+        if ! self.func_uniq_call_set.contains(&hashstring) {
+          for f1 in &func_set{
+            for f2 in &func_set{
+              *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
+            }
+          }
+          self.func_uniq_call_set.insert(hashstring);
+        }
+      } else {
+        for f1 in &func_set{
+          for f2 in &func_set{
+            *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
+          }
         }
       }
     }
@@ -515,17 +539,19 @@ impl Drop for Executor {
     let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap();
     let mut rel_all_file = OpenOptions::new().write(true).create(true)
                     .open(rel_path.join("rel_all.csv")).expect("can't open rel_all_file");
+
+    if let Err(_) = writeln!(rel_all_file, "choose : {}, # of selected TC : {}", config::FUNC_REL_CHOOSE, self.func_uniq_call_set.len()) {eprintln!("can't write ")};
     if let Err(_) = write!(rel_all_file, ",") {eprintln!("can't write in rel_all.csv");}
-    let mut func_list = Vec::<String>::new();
-    for (f1, _rel1) in self.func_rel_map.iter() {
-      func_list.push(f1.clone());
+    let mut func_list = Vec::<u32>::new();
+    for (fid, _rel) in self.func_rel_map.iter() {
+      func_list.push(*fid);
     }
     for f1 in &func_list {
-      if let Err(_) = write!(rel_all_file, "{},", f1) {eprintln!("can't write 1")}
+      if let Err(_) = write!(rel_all_file, "{},", self.func_id_map.get(f1).unwrap()) {eprintln!("can't write 1")}
     }
     if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
     for f1 in &func_list {
-      if let Err(_) = write!(rel_all_file, "{},", f1) {eprintln!("can't write 1")}
+      if let Err(_) = write!(rel_all_file, "{},", self.func_id_map.get(f1).unwrap()) {eprintln!("can't write 1")}
       for f2 in &func_list {
         if let Err(_) = write!(rel_all_file, "{},", self.func_rel_map.get(f1).unwrap().get(f2).unwrap()) {eprintln!("can't write 1")}
       }

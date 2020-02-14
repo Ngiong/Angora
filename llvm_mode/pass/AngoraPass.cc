@@ -907,7 +907,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     sourceFileName.erase(0,2);
   }
   if (FastMode){
-    func.open("FInfo-cmp-" + sourceFileName + ".txt", std::ofstream::out | std::ofstream::app);
+    func.open("FuncInfo.txt", std::ofstream::out | std::ofstream::app);
   }
   for (auto &F : M) {
     if (F.isDeclaration() || F.getName().startswith(StringRef("asan.module")))
@@ -952,7 +952,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
       }
     }
     if ((cmp_list.size() > 0) && FastMode){
-      func << sourceFileName << ":" << F.getName().str() << "," << cmp_list.size() << "\n";
+      func << F.getName().str() << "," << cmp_list.size() << "\n";
       for (auto i = cmp_list.begin(); i != cmp_list.end(); i++){
         func << *i << ",";
       }

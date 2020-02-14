@@ -96,7 +96,7 @@ pub fn bind_thread_to_cpu_core(_cid: usize) {
 pub fn bind_thread_to_cpu_core(cid: usize) {
     // let tid = unsafe { libc::pthread_self() };
     unsafe {
-        let mut c: libc::cpu_set_t = mem::uninitialized();
+        let mut c: libc::cpu_set_t = mem::zeroed(); //mem::uninitialized();
         libc::CPU_ZERO(&mut c);
         libc::CPU_SET(cid, &mut c);
         if libc::sched_setaffinity(0, mem::size_of_val(&c), &c as *const libc::cpu_set_t) != 0 {

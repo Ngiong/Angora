@@ -38,3 +38,4 @@ llvm_mode/build/
 /run2.sh
 /run3.sh
 /0920/
+inputs_vuzzer/

@@ -46,18 +46,8 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 
 //Cheong
-pub const FUNC_CHOOSE_LOOP_MAX : u32 = 40;
-pub const FUNC_TARGET_NUMBER_OF_COND : u32 = 20;
-pub const FUNC_TARGET_PRIORITY_THREASHOLD : u16 = 10;
-pub const FUNC_REL_NUM : usize = 0;
-pub const FUNC_REL_RATIO : f64 = 0.3;
-pub const INPUT_FUZZ_MAX_TIME : usize = 10;
-pub const DEBUG_IO : bool = true;
 pub const FUNC_REL_HIGH_THRESHOLD : f64 = 0.8;
-pub const FUNC_REL_LOW_THRESHOLD : f64 = 0.2;
-pub const REL_ALL : bool = false;
 pub const REL_HIGH : bool = true;
 pub const PRIORITIZE : bool = false;
-pub const RANDOM_SELECT : bool = false;
-pub const RANDOM_SIZE : usize = 10;
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 3;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
+pub const FUNC_REL_CHOOSE : bool = true;

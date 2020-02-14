@@ -3,8 +3,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::collections::HashMap;
 use crate::depot::Depot;
-use angora_common::{config, defs, tag::TagSeg};
-use rand::{thread_rng, Rng};
+use angora_common::{config, defs};
 use std;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,27 +93,22 @@ impl fmt::Display for CondState {
 }
 
 pub trait NextState {
-    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
-                    func_rel_map : &HashMap<String, HashMap<String, u32>>);
+    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+                    func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_offsets_opt(&mut self);
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
     fn to_det(&mut self);
-    fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>);
-    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
-                                      func_rel_map : &HashMap<String, HashMap<String, u32>>);
+    fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>);
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
-    fn random_select(&mut self, depot : &Arc<Depot>);
-    fn to_next_input(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
-                               func_rel_map : &HashMap<String, HashMap<String,u32>>);
-    fn belongs_prioritize(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
-                               func_rel_map : &HashMap<String, HashMap<String,u32>>);
 }
 
 impl NextState for CondStmt {
-    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
-                             func_rel_map : &HashMap<String, HashMap<String, u32>>) {
+    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+                             func_rel_map : &HashMap<u32, HashMap<u32, u32>>) {
         match self.state {
             CondState::Offset => {
                 if self.offsets_opt.len() > 0 {
@@ -141,17 +135,10 @@ impl NextState for CondStmt {
                 self.to_offsets_func(depot, func_cmp_map);
             },
             CondState::OffsetFunc => {
-                if config::RANDOM_SELECT {
-                  self.random_select(depot);
-                } else {
                   self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
-                }
             },
             CondState::OffsetRelFunc => {
                 self.to_offsets_all_end();
-            },
-            CondState::OffsetAllEnd => {
-                self.to_next_input(func_cmp_map, func_rel_map);
             },
             _ => {},
         }
@@ -176,11 +163,10 @@ impl NextState for CondStmt {
         self.state = CondState::OffsetAllEnd;
     }
     
-    fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>) {
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
-        if !config::REL_ALL &&
-             (!config::REL_HIGH || config::RANDOM_SELECT || func_cmp_map.len() == 0) { return; }
+        if func_cmp_map.len() == 0 { return; }
         let mut cmp_list : Vec<u32> = Vec::new();
         //get function which contain target cmp
         for (_k, v) in func_cmp_map {
@@ -200,91 +186,28 @@ impl NextState for CondStmt {
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         self.ext_offset_size = after_size - before_size;
     }
-   
-    fn to_next_input (&mut self,func_cmp_map : &HashMap<String, Vec<u32>>,
-                                      func_rel_map : &HashMap<String, HashMap<String, u32>>) {
-      if !config::PRIORITIZE { return ; }
-      let new_belong = match self.belongs.peek(){
-        Some((_, 0))  => {
-          self.belongs_prioritize(func_cmp_map, func_rel_map);
-          self.belongs.peek().expect("can't get belongs").0.clone()
-        },
-        Some ((b, _)) => {b.clone()},
-        None => {(0,0,vec![], vec![])},
-      };
-      if new_belong.2.len() == 0 { return; }
-      self.belongs.change_priority(&new_belong, 0);
-      self.base.belong = new_belong.0;
-      self.offsets = new_belong.2.clone();
-      self.cur_fuzz_times = 0;
-      self.state = CondState::Offset;
-    }
-
-    fn belongs_prioritize(&mut self, func_cmp_map : &HashMap<String, Vec<u32>>,
-                               func_rel_map : &HashMap<String, HashMap<String,u32>>) {
-      let mut cmp_list : Vec<u32> = Vec::new();
-      let mut cmp_func : String = String::new();
-      //get func which contains the cmp.
-      for (k, v) in func_cmp_map {
-        if v.contains(&self.base.cmpid) {cmp_func = k.clone(); break; }
-      }
-      //get cmp list of rel func
-      let rels : &HashMap<String, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
-      let mut rel_list : Vec<(String, u32)> = Vec::new();
-      let mut target_runs = 0;
-      for (k, v) in rels{
-         rel_list.push((k.clone(), *v));
-         if *k == cmp_func { target_runs = *v;}
-      }
-      rel_list.retain(|x| x.1 > 0);
-      if !config::REL_ALL{
-        if config::REL_HIGH {
-          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
-        } else {
-          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) < config::FUNC_REL_LOW_THRESHOLD);
-        }
-      }
-      for (rel_func, _rel) in rel_list {
-        let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
-        cmp_list.append(&mut rel_cmp_list);
-      }
-      for (old_belong, p) in self.belongs.iter_mut(){
-        if old_belong.1 == 0 {
-          let mut common_list = cmp_list.clone();
-          common_list.retain(|x| old_belong.3.contains(&x));
-          old_belong.1 = ((common_list.len() as f32) / (old_belong.3.len() as f32) * 1000.0) as u32;
-        };
-        *p = old_belong.1;
-      }
-    }
  
-    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<String, Vec<u32>>,
-                                      func_rel_map : &HashMap<String, HashMap<String, u32>>){
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetRelFunc;
         if func_cmp_map.len() == 0 {return ; }
         let mut cmp_list : Vec<u32> = Vec::new();
-        let mut cmp_func : String = String::new();
+        let mut cmp_func : u32 = 0;
         //get func which contains the cmp.
         for (k, v) in func_cmp_map {
-          if v.contains(&self.base.cmpid) {cmp_func = k.clone(); break; }
+          if v.contains(&self.base.cmpid) {cmp_func = *k; break; }
         }
         //get cmp list of rel func
-        let rels : &HashMap<String, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
-        let mut rel_list : Vec<(String, u32)> = Vec::new();
+        let rels : &HashMap<u32, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
+        let mut rel_list : Vec<(u32, u32)> = Vec::new();
         let mut target_runs = 0;
         for (k, v) in rels{
-           rel_list.push((k.clone(), *v));
+           rel_list.push((*k, *v));
            if *k == cmp_func { target_runs = *v;}
         }
-        rel_list.retain(|x| x.1 > 0);
-        if !config::REL_ALL{
-          if config::REL_HIGH {
-            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
-          } else {
-            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) < config::FUNC_REL_LOW_THRESHOLD);
-          }
-        }
+        //rel_list.retain(|x| x.1 > 0);
+        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
@@ -306,20 +229,6 @@ impl NextState for CondStmt {
         self.ext_offset_size_rel = after_size - before_size;
     }
 
-    fn random_select(&mut self, depot : &Arc<Depot>){
-      let mut new_offset = vec![];
-      self.state = CondState::OffsetRelFunc;
-      let before_size = self.get_offset_len() + self.get_offset_opt_len();
-      let buf_len = depot.get_input_buf(self.base.belong as usize).len();
-      for _i in 0..config::RANDOM_SIZE {
-        let random_off :u32 = thread_rng().gen_range(0, buf_len) as u32;
-        let random_byte = vec![TagSeg {sign : false, begin : random_off, end : random_off+1,}];
-        new_offset = merge_offsets(&new_offset, &random_byte);
-      } 
-      self.offsets = merge_offsets(&self.offsets, &new_offset);
-      let after_size = self.get_offset_len() + self.get_offset_opt_len();
-      self.ext_offset_size_rel = after_size - before_size;
-    }
     fn to_unsolvable(&mut self) {
         debug!("to unsovable");
         self.state = CondState::Unsolvable;

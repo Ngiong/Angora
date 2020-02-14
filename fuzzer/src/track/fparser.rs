@@ -92,7 +92,7 @@ pub fn load_track_data(
         }
     };
 
-    if config::DEBUG_IO && false {
+    if false {
     //cheong
     let cond_out_path = &out_f.parent().unwrap().parent().unwrap().join("conds.txt");
     let exists = &cond_out_path.exists();

@@ -54,7 +54,7 @@ pub fn fuzz_main(
     let depot = Arc::new(depot::Depot::new(seeds_dir, &angora_out_dir)); //queue for main fuzz loop
     info!("{:?}", depot.dirs);
 
-    let func_cmp_map = get_func_cmp_map (func_cmp_map); 
+    let (func_cmp_map, func_id_map) = get_func_maps (func_cmp_map); 
 
     record_parameter(&angora_out_dir, &command_option, in_dir);
     let stats = Arc::new(RwLock::new(stats::ChartStats::new(&track_target ,&out_dir, func_cmp_map.len() != 0)));
@@ -68,6 +68,7 @@ pub fn fuzz_main(
         global_branches.clone(),
         depot.clone(),
         stats.clone(),
+        HashMap::new(),
         HashMap::new(),
         HashMap::new(),
     );
@@ -93,6 +94,7 @@ pub fn fuzz_main(
         &depot,
         &stats,
         &func_cmp_map, 
+        &func_id_map,
     );
 
     let log_file = match fs::File::create(angora_out_dir.join(defs::ANGORA_LOG_FILE)) {
@@ -128,15 +130,17 @@ pub fn fuzz_main(
 }
 
 
-fn get_func_cmp_map (s : Option<&str>) -> HashMap<String, Vec<u32>> {
-  if s == None {return HashMap::new()}
+fn get_func_maps (s : Option<&str>) -> (HashMap<u32, Vec<u32>>, HashMap<u32, String>) {
+  if s == None {return (HashMap::new(),HashMap::new())}
   let mut ff = fs::File::open(s.unwrap()).expect("File not Found");
   let mut conts = String::new();
   ff.read_to_string(&mut conts).expect("Can't read file");
-  let mut func_map : HashMap<String, Vec<u32>> = HashMap::new();
+  let mut func_cmp_map : HashMap<u32, Vec<u32>> = HashMap::new();
+  let mut func_id_map : HashMap<u32,String> = HashMap::new();
   let mut cmplist : Vec<u32> = Vec::new();
   let mut funcname = String::new();
   let mut cmpid = String::new();
+  let mut func_id = 0;
   let mut stage = 0; // 0 for funcname, 1 for tmp, 2 for cmp
   for c in conts.chars() {
     match &stage {
@@ -149,7 +153,9 @@ fn get_func_cmp_map (s : Option<&str>) -> HashMap<String, Vec<u32>> {
       1 => { if c == '\n' { stage = 2; } },
       2 => { if c == '\n' {
                stage = 0;
-               func_map.insert(funcname, cmplist);
+               func_cmp_map.insert(func_id, cmplist);
+               func_id_map.insert(func_id,funcname);
+               func_id += 1;
                funcname = String::new();
                cmplist = Vec::new();
             } else if c == ',' {
@@ -162,7 +168,7 @@ fn get_func_cmp_map (s : Option<&str>) -> HashMap<String, Vec<u32>> {
        _ => {panic!();},
     };
   }
-  func_map
+  (func_cmp_map, func_id_map)
 }
 
 
@@ -222,9 +228,9 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     write!(buff," {}", s).expect("Could not write to param file");
   }
   writeln!(buff,"").expect("Could nout write to param file");
-  write!(buff, ", MAP_SIZE : {}, Random : {}, Prioritize : {}, ALL : {}, HIGH : {}, H_THRESHOLD: {}, L_THRESHOLD: {}",
-         config::MAP_SIZE_POW2, config::RANDOM_SELECT, config::PRIORITIZE, config::REL_ALL, config::REL_HIGH,
-         config::FUNC_REL_HIGH_THRESHOLD, config::FUNC_REL_LOW_THRESHOLD).expect("Could not write to param file");
+  write!(buff, ", MAP_SIZE : {}, H_THRESHOLD: {}",
+         config::MAP_SIZE_POW2, 
+         config::FUNC_REL_HIGH_THRESHOLD).expect("Could not write to param file");
 }
 
 fn create_stats_file_and_write_pid(angora_out_dir: &PathBuf) -> PathBuf {
@@ -249,7 +255,8 @@ fn init_cpus_and_run_fuzzing_threads(
     global_branches: &Arc<branches::GlobalBranches>,
     depot: &Arc<depot::Depot>,
     stats: &Arc<RwLock<stats::ChartStats>>,
-    func_cmp_map : &HashMap<String, Vec<u32>>,
+    func_cmp_map : &HashMap<u32, Vec<u32>>,
+    func_id_map : &HashMap<u32, String>,
 ) -> (Vec<thread::JoinHandle<()>>, Arc<AtomicUsize>) {
     let child_count = Arc::new(AtomicUsize::new(0));
     let mut handlers = vec![];
@@ -269,13 +276,14 @@ fn init_cpus_and_run_fuzzing_threads(
         let b = global_branches.clone();
         let s = stats.clone();
         let fcmp = func_cmp_map.clone();
+        let fid = func_id_map.clone();
         let cid = if bind_cpus { free_cpus[thread_id] } else { 0 };
         let handler = thread::spawn(move || {
             c.fetch_add(1, Ordering::SeqCst);
             if bind_cpus {
                 bind_cpu::bind_thread_to_cpu_core(cid);
             }
-            fuzz_loop::fuzz_loop(r, cmd, d, b, s, fcmp);
+            fuzz_loop::fuzz_loop(r, cmd, d, b, s, fcmp, fid);
         });
         handlers.push(handler);
     }
@@ -309,7 +317,7 @@ fn main_thread_sync_and_log(
     while running.load(Ordering::SeqCst) {
         thread::sleep(time::Duration::from_secs(5));
         if init_time.elapsed() >= Duration::from_secs(config::FUZZ_TIME_OUT.into()) { running.store(false, Ordering::SeqCst);}
-        if config::DEBUG_IO && (depot_rec_time.elapsed() >= Duration::from_secs(60 * 10)) {
+        if false && (depot_rec_time.elapsed() >= Duration::from_secs(60 * 10)) {
           let out_path = Path::new(out_dir);
           depot.log(&out_path, &mut depot_rec_idx);
           depot_rec_time = Instant::now();
