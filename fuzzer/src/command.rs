@@ -79,7 +79,7 @@ impl CommandOpt {
 
         let track_path = tmp_dir.join(TRACK_FILE).to_str().unwrap().to_owned();
 
-        let has_input_arg = pargs.contains(&"@@".to_string());
+        let has_input_arg = pargs.contains(&"@@".to_string()) || pargs.contains(&"@@@".to_string());
 
         let clang_lib = Command::new("llvm-config")
             .arg("--libdir")
@@ -160,14 +160,14 @@ impl CommandOpt {
             for arg in &mut cmd_opt.main.1 {
                 if arg == "@@" {
                     *arg = new_file.clone();
-                } else if arg == "@%%" {
+                } else if arg == "@@@" {
                     *arg = new_file2.clone();
                 }
             }
             for arg in &mut cmd_opt.track.1 {
                 if arg == "@@" {
                     *arg = new_file.clone();
-                } else if arg == "@%%" {
+                } else if arg == "@@@" {
                     *arg = new_file2.clone();
                 }
             }
