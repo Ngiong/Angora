@@ -39,3 +39,4 @@ llvm_mode/build/
 /run3.sh
 /0920/
 inputs_vuzzer/
+nohup*

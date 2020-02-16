@@ -52,4 +52,4 @@ pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 72;
 pub const FUNC_REL_TC_SELECT : bool = true;
 
 // executor.rs
-pub const LONG_FUZZ_TIME: usize = 2;
+pub const LONG_FUZZ_TIME: usize = 8;

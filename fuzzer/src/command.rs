@@ -153,17 +153,22 @@ impl CommandOpt {
     pub fn specify(&self, id: usize) -> Self {
         let mut cmd_opt = self.clone();
         let new_file = format!("{}_{}", &cmd_opt.out_file, id);
+        let new_file2 = format!("@{}_{}", &cmd_opt.out_file, id);
         let new_forksrv_socket_path = format!("{}_{}", &cmd_opt.forksrv_socket_path, id);
         let new_track_path = format!("{}_{}", &cmd_opt.track_path, id);
         if !self.is_stdin {
             for arg in &mut cmd_opt.main.1 {
                 if arg == "@@" {
                     *arg = new_file.clone();
+                } else if arg == "@@@" {
+                    *arg = new_file2.clone();
                 }
             }
             for arg in &mut cmd_opt.track.1 {
                 if arg == "@@" {
                     *arg = new_file.clone();
+                } else if arg == "@@@" {
+                    *arg = new_file2.clone();
                 }
             }
         }
