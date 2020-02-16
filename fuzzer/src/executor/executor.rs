@@ -484,7 +484,7 @@ impl Executor {
       }
 
       //Hashing 
-      if config::FUNC_REL_CHOOSE {
+      if config::FUNC_REL_TC_SELECT {
         let mut hashstring = String::from("1");
         maxfuncid -= 1;
         loop {
@@ -540,7 +540,8 @@ impl Drop for Executor {
     let mut rel_all_file = OpenOptions::new().write(true).create(true)
                     .open(rel_path.join("rel_all.csv")).expect("can't open rel_all_file");
 
-    if let Err(_) = writeln!(rel_all_file, "choose : {}, # of selected TC : {}", config::FUNC_REL_CHOOSE, self.func_uniq_call_set.len()) {eprintln!("can't write ")};
+    if let Err(_) = writeln!(rel_all_file, "choose : {}, # of selected TC : {}",
+                             config::FUNC_REL_TC_SELECT, self.func_uniq_call_set.len()) {eprintln!("can't write ")};
     if let Err(_) = write!(rel_all_file, ",") {eprintln!("can't write in rel_all.csv");}
     let mut func_list = Vec::<u32>::new();
     for (fid, _rel) in self.func_rel_map.iter() {

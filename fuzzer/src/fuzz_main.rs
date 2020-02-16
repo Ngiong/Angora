@@ -220,8 +220,9 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     Ok(a) => a,
     Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
   };
-  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}",
-               out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0)
+  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, long_fuzz_step : {}, tc selection : {} ",
+               out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0,
+               config::FUZZ_TIME_OUT / 3600, config::LONG_FUZZ_TIME, config::FUNC_REL_TC_SELECT)
          .expect("Could not write to param file");
   writeln!(buff, "").expect("Could not write");
   for s in &command.main.1{
