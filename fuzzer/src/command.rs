@@ -160,14 +160,14 @@ impl CommandOpt {
             for arg in &mut cmd_opt.main.1 {
                 if arg == "@@" {
                     *arg = new_file.clone();
-                } else if arg == "@@@" {
+                } else if arg == "@%%" {
                     *arg = new_file2.clone();
                 }
             }
             for arg in &mut cmd_opt.track.1 {
                 if arg == "@@" {
                     *arg = new_file.clone();
-                } else if arg == "@@@" {
+                } else if arg == "@%%" {
                     *arg = new_file2.clone();
                 }
             }
