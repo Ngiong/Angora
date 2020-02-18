@@ -101,7 +101,7 @@ pub trait NextState {
     fn to_det(&mut self);
     fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>);
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
-                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
+                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>, end : bool);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
 }
@@ -135,10 +135,11 @@ impl NextState for CondStmt {
                 self.to_offsets_func(depot, func_cmp_map);
             },
             CondState::OffsetFunc => {
-                  self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
+                  self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, false);
             },
             CondState::OffsetRelFunc => {
-                self.to_offsets_all_end();
+                self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, true);
+                //self.to_offsets_all_end();
             },
             _ => {},
         }
@@ -188,7 +189,7 @@ impl NextState for CondStmt {
     }
  
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
-                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>){
+                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>, end : bool){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetRelFunc;
         if func_cmp_map.len() == 0 {return ; }
@@ -207,7 +208,11 @@ impl NextState for CondStmt {
            if *k == cmp_func { target_runs = *v;}
         }
         //rel_list.retain(|x| x.1 > 0);
-        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+        if !end {
+          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+        } else {
+          rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD2);
+        }
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
