@@ -50,6 +50,7 @@ pub const REL_HIGH : bool = true;
 pub const PRIORITIZE : bool = false;
 pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 72;
 pub const FUNC_REL_TC_SELECT : bool = true;
+pub const FUNC_CMP_SIZE : usize = 20;
 
 // executor.rs
 pub const LONG_FUZZ_TIME: usize = 8;

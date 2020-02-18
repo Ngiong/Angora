@@ -6,6 +6,10 @@
 #endif
 #define MAP_SIZE (1 << MAP_SIZE_POW2)
 #define ENABLE_UNFOLD_BRANCH 1
+
+#ifndef FUNC_CMP_SIZE
+#define FUNC_CMP_SIZE 10
+#endif
 // #define DEBUG_INFO
 // #define ALLOC_PRELOAD
 

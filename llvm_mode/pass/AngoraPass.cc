@@ -951,7 +951,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         }
       }
     }
-    if ((cmp_list.size() > 0) && FastMode){
+    if ((cmp_list.size() >= FUNC_CMP_SIZE) && FastMode){
       func << F.getName().str() << "," << cmp_list.size() << "\n";
       for (auto i = cmp_list.begin(); i != cmp_list.end(); i++){
         func << *i << ",";

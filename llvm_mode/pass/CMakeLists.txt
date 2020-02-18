@@ -12,7 +12,14 @@ else()
     message(FATAL_ERROR "You haven't install LLVM !")
 endif()
 
-
+EXECUTE_PROCESS(
+    COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../../common/src/config.rs          
+    COMMAND grep "pub const FUNC_CMP_SIZE"
+    COMMAND cut -f2 -d "="  
+    COMMAND grep -o "[[:digit:]]*"
+    COMMAND tr -d "\n" 
+    OUTPUT_VARIABLE FUNC_CMP_SIZE
+)
 EXECUTE_PROCESS(
     COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/../../common/src/config.rs          
     COMMAND grep "pub const MAP_SIZE_POW2"
@@ -22,6 +29,7 @@ EXECUTE_PROCESS(
     OUTPUT_VARIABLE MAP_SIZE_POW2
 )
 message(STATUS "MAP_SIZE_POW2: ${MAP_SIZE_POW2}")
+message(STATUS "FUNC_CMP_SIZE: ${FUNC_CMP_SIZE}")
 
 if (NOT TARGET LLVMPassConfig)
     add_library(LLVMPassConfig INTERFACE IMPORTED)
