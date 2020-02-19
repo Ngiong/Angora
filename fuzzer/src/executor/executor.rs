@@ -40,7 +40,8 @@ pub struct Executor {
     pub func_cmp_map : HashMap<u32, Vec<u32>>,
     pub func_id_map : HashMap<u32, String>,
     pub rel_rec_set : HashSet<usize>,
-    pub func_uniq_call_set : HashSet<String>,
+    pub func_uniq_call_set : HashSet<Vec<u32>>,
+    pub func_executed : Vec<u32>,
 }
 
 impl Executor {
@@ -114,6 +115,7 @@ impl Executor {
             func_id_map : func_id_map,
             rel_rec_set : HashSet::new(),
             func_uniq_call_set : HashSet::new(),
+            func_executed : vec![],
         }
     }
 
@@ -465,14 +467,12 @@ impl Executor {
     
     pub fn get_func_and_record(&mut self, cond_list : Vec<cond_stmt::CondStmt>) {
       let mut func_set = HashSet::new();
-      let mut maxfuncid = 0;
       for c in cond_list{
         let mut found = false;
         for (funcid, cmplist) in &self.func_cmp_map{
           for cmpi in cmplist {
             if *cmpi == c.base.cmpid {
               func_set.insert(*funcid);
-              if maxfuncid < *funcid { maxfuncid = *funcid}
               found = true;
               break;
             }
@@ -485,24 +485,45 @@ impl Executor {
 
       //Hashing 
       if config::FUNC_REL_TC_SELECT {
-        let mut hashstring = String::from("1");
-        maxfuncid -= 1;
-        loop {
-          if func_set.contains(&maxfuncid) {
-            hashstring.push('1');
-          } else {
-            hashstring.push('0');
+        let mut hashvec : Vec<u32> = vec![0];
+        let mut tmpidx = 0;
+        let mut hashidx = 0;
+        for func_id in self.func_executed.iter() {
+          if func_set.contains(func_id) {
+             if let Some (helem) = hashvec.get_mut(hashidx) {
+               *helem = *helem | (1 << tmpidx);
+             } else {panic!();}
+            if !func_set.remove(func_id) {
+              panic!();
+            }
           }
-          if maxfuncid == 0 { break; }
-          maxfuncid -= 1;
+          tmpidx += 1;
+          if tmpidx >= 32 {
+            tmpidx = 0;
+            hashidx += 1;
+            hashvec.push(0);
+          }
         }
-        if ! self.func_uniq_call_set.contains(&hashstring) {
+        //The rest of func_set are functions which are executed first time.
+        for func in &func_set {
+          self.func_executed.push(*func);
+          if let Some (helem) = hashvec.get_mut(hashidx) {
+            *helem = *helem + ( 1 << tmpidx);
+          } else { panic!();} 
+          tmpidx += 1;
+          if tmpidx >= 32 {
+            tmpidx = 0;
+            hashidx += 1;
+            hashvec.push(0);
+          }
+        }
+        if ! self.func_uniq_call_set.contains(&hashvec) {
           for f1 in &func_set{
             for f2 in &func_set{
               *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
             }
           }
-          self.func_uniq_call_set.insert(hashstring);
+          self.func_uniq_call_set.insert(hashvec);
         }
       } else {
         for f1 in &func_set{

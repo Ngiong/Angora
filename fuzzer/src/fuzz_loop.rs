@@ -28,6 +28,7 @@ pub fn fuzz_loop(
       }
       func_rel_map.insert(*k1, tmp_map);
     }
+
     let mut executor = Executor::new(
         cmd_opt,
         global_branches,
