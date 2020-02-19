@@ -71,6 +71,7 @@ pub fn fuzz_main(
         HashMap::new(),
         HashMap::new(),
         HashMap::new(),
+        255
     );
 
     //put seed in the queue
@@ -284,7 +285,7 @@ fn init_cpus_and_run_fuzzing_threads(
             if bind_cpus {
                 bind_cpu::bind_thread_to_cpu_core(cid);
             }
-            fuzz_loop::fuzz_loop(r, cmd, d, b, s, fcmp, fid);
+            fuzz_loop::fuzz_loop(r, cmd, d, b, s, fcmp, fid, cid);
         });
         handlers.push(handler);
     }

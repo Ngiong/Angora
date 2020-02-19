@@ -8,6 +8,7 @@ use crate::{
 use angora_common::{config, defs};
 
 use std::{
+    fs,
     collections::{HashMap, HashSet},
     path::Path,
     process::{Command, Stdio},
@@ -42,6 +43,7 @@ pub struct Executor {
     pub rel_rec_set : HashSet<usize>,
     pub func_uniq_call_set : HashSet<Vec<u32>>,
     pub func_executed : Vec<u32>,
+    pub cid : usize,
 }
 
 impl Executor {
@@ -52,7 +54,8 @@ impl Executor {
         global_stats: Arc<RwLock<stats::ChartStats>>,
         func_rel_map : HashMap<u32, HashMap<u32, u32>>,
         func_cmp_map : HashMap<u32, Vec<u32>>,
-        func_id_map : HashMap<u32, String>
+        func_id_map : HashMap<u32, String>,
+        cid : usize,
     ) -> Self {
         // ** Share Memory **
         let branches = branches::Branches::new(global_branches);
@@ -116,6 +119,7 @@ impl Executor {
             rel_rec_set : HashSet::new(),
             func_uniq_call_set : HashSet::new(),
             func_executed : vec![],
+            cid : cid,
         }
     }
 
@@ -555,11 +559,12 @@ impl Executor {
 
 impl Drop for Executor {
   fn drop(&mut self) {
-    if self.func_rel_map.len() == 0 { return;}
+    if self.func_rel_map.len() == 0 || self.cid == 255 { return;}
     info!("dump func rel ..");
-    let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap();
+    let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap().join("rels");
+    if let Err(_) = fs::create_dir(&rel_path) {()}
     let mut rel_all_file = OpenOptions::new().write(true).create(true)
-                    .open(rel_path.join("rel_all.csv")).expect("can't open rel_all_file");
+                    .open(rel_path.join(format!("rel_all_{}.csv",self.cid))).expect("can't open rel_all_file");
 
     if let Err(_) = writeln!(rel_all_file, "choose : {}, # of selected TC : {}",
                              config::FUNC_REL_TC_SELECT, self.func_uniq_call_set.len()) {eprintln!("can't write ")};

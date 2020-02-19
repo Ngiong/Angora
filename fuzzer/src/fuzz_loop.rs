@@ -17,7 +17,8 @@ pub fn fuzz_loop(
     global_branches: Arc<GlobalBranches>,
     global_stats: Arc<RwLock<stats::ChartStats>>,
     func_cmp_map : HashMap<u32, Vec<u32>>,
-    func_id_map : HashMap<u32, String>
+    func_id_map : HashMap<u32, String>,
+    cid : usize,
 ) {
     let search_method = cmd_opt.search_method;
     let mut func_rel_map : HashMap<u32, HashMap<u32, u32>> = HashMap::new();
@@ -37,6 +38,7 @@ pub fn fuzz_loop(
         func_rel_map,
         func_cmp_map,
         func_id_map,
+        cid,
     );
     while running.load(Ordering::Relaxed) {
         let entry = match depot.get_entry() {
