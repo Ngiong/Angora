@@ -490,7 +490,7 @@ impl Executor {
 
       //Hashing 
       if config::FUNC_REL_TC_SELECT {
-        let func_orig_set = func_set.clone()
+        let func_orig_set = func_set.clone();
         let mut hashvec : Vec<u32> = vec![0];
         let mut tmpidx = 0;
         let mut hashidx = 0;
