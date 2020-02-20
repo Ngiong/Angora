@@ -320,7 +320,7 @@ __dfsw__IO_getc(FILE *fd, dfsan_label fd_label, dfsan_label *ret_label) {
 }
 
 __attribute__((visibility("default"))) int
-__dfsw__getc(FILE *fd, dfsan_label fd_label, dfsan_label *ret_label) {
+__dfsw_getc(FILE *fd, dfsan_label fd_label, dfsan_label *ret_label) {
   return __dfsw__IO_getc(fd, fd_label, ret_label);
 }
 
