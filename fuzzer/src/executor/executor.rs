@@ -487,8 +487,10 @@ impl Executor {
         }
       }
 
+
       //Hashing 
       if config::FUNC_REL_TC_SELECT {
+        let func_orig_set = func_set.clone()
         let mut hashvec : Vec<u32> = vec![0];
         let mut tmpidx = 0;
         let mut hashidx = 0;
@@ -522,8 +524,8 @@ impl Executor {
           }
         }
         if ! self.func_uniq_call_set.contains(&hashvec) {
-          for f1 in &func_set{
-            for f2 in &func_set{
+          for f1 in &func_orig_set{
+            for f2 in &func_orig_set{
               *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
             }
           }
