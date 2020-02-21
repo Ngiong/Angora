@@ -221,18 +221,19 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     Ok(a) => a,
     Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
   };
-  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, long_fuzz_step : {}, tc selection : {} ",
+  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, tc selection : {} ",
                out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0,
-               config::FUZZ_TIME_OUT / 3600, config::LONG_FUZZ_TIME, config::FUNC_REL_TC_SELECT)
+               config::FUZZ_TIME_OUT / 3600, config::FUNC_REL_TC_SELECT)
          .expect("Could not write to param file");
   writeln!(buff, "").expect("Could not write");
   for s in &command.main.1{
     write!(buff," {}", s).expect("Could not write to param file");
   }
   writeln!(buff,"").expect("Could nout write to param file");
-  write!(buff, ", MAP_SIZE : {}, H_THRESHOLD: {}",
+  write!(buff, ", MAP_SIZE : {}, H_THRESHOLD1: {}, H_THRESHOLD2: {}, H_THRESHOLD3: {}",
          config::MAP_SIZE_POW2, 
-         config::FUNC_REL_HIGH_THRESHOLD).expect("Could not write to param file");
+         config::FUNC_REL_HIGH_THRESHOLD1, config::FUNC_REL_HIGH_THRESHOLD2,
+         config::FUNC_REL_HIGH_THRESHOLD3).expect("Could not write to param file");
 }
 
 fn create_stats_file_and_write_pid(angora_out_dir: &PathBuf) -> PathBuf {

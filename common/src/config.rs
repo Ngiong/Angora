@@ -45,11 +45,12 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 
 //Cheong
-pub const FUNC_REL_HIGH_THRESHOLD : f64 = 0.8;
+pub const FUNC_REL_HIGH_THRESHOLD1 : f64 = 0.8;
 pub const FUNC_REL_HIGH_THRESHOLD2 : f64 = 0.5;
+pub const FUNC_REL_HIGH_THRESHOLD3 : f64 = 0.1;
 pub const REL_HIGH : bool = true;
 pub const PRIORITIZE : bool = false;
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 72;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
 pub const FUNC_REL_TC_SELECT : bool = true;
 pub const FUNC_CMP_SIZE : usize = 20;
 

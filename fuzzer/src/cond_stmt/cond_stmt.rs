@@ -21,7 +21,9 @@ pub struct CondStmt {
     pub linear: bool,
     pub belongs : PriorityQueue<(u32, u32, Vec<TagSeg>, Vec<u32>), u32>, // (input id, basic_priority, offset)
     pub ext_offset_size : u32,
-    pub ext_offset_size_rel : u32,
+    pub ext_offset_size_rel1 : u32,
+    pub ext_offset_size_rel2 : u32,
+    pub ext_offset_size_rel3 : u32,
 }
 
 impl PartialEq for CondStmt {
@@ -58,7 +60,9 @@ impl CondStmt {
             linear: false,
             belongs : PriorityQueue::new(),
             ext_offset_size : 0,
-            ext_offset_size_rel : 0,
+            ext_offset_size_rel1 : 0,
+            ext_offset_size_rel2 : 0,
+            ext_offset_size_rel3 : 0,
         }
     }
 
