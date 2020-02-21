@@ -1,6 +1,6 @@
 use super::*;
 use angora_common::defs;
-use std::{fs, io::prelude::*};
+use std::{fs,fs::OpenOptions, io::prelude::*};
 
 impl Drop for Depot {
     fn drop(&mut self) {
@@ -41,6 +41,21 @@ impl Drop for Depot {
                 )
                 .unwrap();
             }
+        }
+        let cpath = self.dirs.crashes_dir.as_path().parent().unwrap().join("conds.csv");
+        let mut cond_file = OpenOptions::new().write(true).create(true)
+                               .open(cpath).expect("Can't open conds.csv");
+        if let Err(_) = writeln!(cond_file,
+              "cmpid,context,belong,condition,state,# of offsets,total offset len,#belongs,fuzz_times,priority,extended_size, extended_size_rel")
+          {eprintln!("can't write conds.csv")}
+        
+        let q = match self.queue.lock() {Ok (g) => g, Err(p) => {p.into_inner()}};
+        let iter = q.iter();
+        for (i, p) in iter {
+          let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{},{}",i.base.cmpid,i.base.context,i.base.belong,
+                                   i.base.condition,i.state,i.offsets.len(),i.get_offset_len(),
+                                   i.belongs.len(),i.fuzz_times,p,i.ext_offset_size,i.ext_offset_size_rel);
+          if let Err(_) = writeln!(cond_file, "{}", condinfo) {eprintln!("can't write conds.csv");}
         }
     }
 }

@@ -314,16 +314,11 @@ fn main_thread_sync_and_log(
     let mut sync_counter = 1;
     show_stats(&mut log_file, depot, global_branches, stats);
     let init_time = Instant::now();
-    let mut depot_rec_time = Instant::now();
-    let mut depot_rec_idx : u32 = 1;
     while running.load(Ordering::SeqCst) {
         thread::sleep(time::Duration::from_secs(5));
         if init_time.elapsed() >= Duration::from_secs(config::FUZZ_TIME_OUT.into()) { running.store(false, Ordering::SeqCst);}
-        if false && (depot_rec_time.elapsed() >= Duration::from_secs(60 * 10)) {
-          let out_path = Path::new(out_dir);
-          depot.log(&out_path, &mut depot_rec_idx);
-          depot_rec_time = Instant::now();
-        }
+          //let out_path = Path::new(out_dir);
+          //depot.log(&out_path, &mut depot_rec_idx);
         sync_counter -= 1;
         if sync_afl && sync_counter <= 0 {
             depot::sync_afl(executor, running.clone(), sync_dir, &mut synced_ids);

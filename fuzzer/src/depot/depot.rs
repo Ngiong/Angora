@@ -3,7 +3,6 @@ use crate::{cond_stmt::CondStmt, executor::StatusType};
 use rand;
 use std::{
     fs,
-    fs::OpenOptions,
     io::prelude::*,
     mem,
     path::{Path, PathBuf},
@@ -165,22 +164,5 @@ impl Depot {
         if cond.is_discarded() {
             q.change_priority(&cond, QPriority::done());
         }
-    }
-
-  pub fn log(&self, o_dir : &Path, rec_idx : &mut u32) {
-      let conds_dir : PathBuf = o_dir.join("conds");
-      if let Err(_) = fs::create_dir(&conds_dir) {();};
-      let log_file_name = conds_dir.join(format!("conds_log_{}.csv", rec_idx));
-      *rec_idx += 1;
-      let mut log_file = OpenOptions::new().write(true).create(true)
-                            .open(log_file_name).expect("can't open conds log");
-      let firstline = format!("cmpid,context,belong,condition,state,# of offsets,total offset len,#belongs,fuzz_times,priority,extended_size, extended_size_rel");
-      if let Err(_) = writeln!(log_file, "{}", firstline) {eprintln!("can't write condslog");}
-      let q = match self.queue.lock() { Ok(g) => g, Err(p) => { p.into_inner()}};
-      let iter = q.iter();
-      for (i, p) in iter {
-        let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{},{}",i.base.cmpid,i.base.context,i.base.belong,i.base.condition,i.state,i.offsets.len(),i.get_offset_len(),i.belongs.len(),i.fuzz_times,p,i.ext_offset_size,i.ext_offset_size_rel);
-        if let Err(_) = writeln!(log_file, "{}", condinfo) {eprintln!("can't write condslog");}
-      }
     }
 }
