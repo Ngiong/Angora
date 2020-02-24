@@ -50,7 +50,7 @@ impl<'a> FnFuzz<'a> {
         let len = self.handler.cond.base.size as usize; // magic bytes's length
         if len > self.handler.cond.variables.len() {
             error!(
-                "maigic length is less than input length. cond: {:?}",
+                "magic length is less than input length. cond: {:?}",
                 self.handler.cond
             );
             return;

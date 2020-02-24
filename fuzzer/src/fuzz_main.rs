@@ -317,7 +317,10 @@ fn main_thread_sync_and_log(
     let init_time = Instant::now();
     while running.load(Ordering::SeqCst) {
         thread::sleep(time::Duration::from_secs(5));
-        if init_time.elapsed() >= Duration::from_secs(config::FUZZ_TIME_OUT.into()) { running.store(false, Ordering::SeqCst);}
+        if init_time.elapsed() >= Duration::from_secs(config::FUZZ_TIME_OUT.into()) {
+          running.store(false, Ordering::SeqCst);
+          warn!("Fuzzing End with Timeout");
+        }
           //let out_path = Path::new(out_dir);
           //depot.log(&out_path, &mut depot_rec_idx);
         sync_counter -= 1;
