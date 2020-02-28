@@ -10,7 +10,7 @@ impl Drop for Depot {
         let mut log_q = fs::File::create(dir.join(defs::COND_QUEUE_FILE)).unwrap();
         writeln!(
             log_q,
-            "cmpid, context, order, belong, priority, op, condition, is_desirable, offsets, state, belongs"
+            "cmpid, context, order, belong, priority, op, condition, is_desirable, offsets, state"
         )
         .unwrap();
         
@@ -18,7 +18,7 @@ impl Drop for Depot {
         let mut cond_file = OpenOptions::new().write(true).create(true)
                                .open(cpath).expect("Can't open conds.csv");
         if let Err(_) = writeln!(cond_file,
-              "cmpid,context,belong,condition,state,# of offsets,total offset len,#belongs,fuzz_times,priority,extended_size, extended_size_rel1, extended_size_rel2, extended_size_rel3")
+              "cmpid,context,belong,condition,state,# of offsets,total offset len,fuzz_times,priority,fuzz_type,extended_size, extended_size_rel1, extended_size_rel2, extended_size_rel3")
           {eprintln!("can't write conds.csv")}
 
         let q = self.queue.lock().unwrap();
@@ -32,7 +32,7 @@ impl Drop for Depot {
 
                 writeln!(
                     log_q,
-                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}, {}",
+                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}",
                     cond.base.cmpid,
                     cond.base.context,
                     cond.base.order,
@@ -45,14 +45,13 @@ impl Drop for Depot {
                     cond.is_desirable,
                     offsets.join("&"),
                     cond.state,
-                    cond.dump_belongs(),
                 )
                 .unwrap();
             }
   
             let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{},{},{},{}",cond.base.cmpid,cond.base.context,cond.base.belong,
                                    cond.base.condition,cond.state,cond.offsets.len(),cond.get_offset_len(),
-                                   cond.belongs.len(),cond.fuzz_times,p,cond.ext_offset_size,cond.ext_offset_size_rel1,
+                                   cond.fuzz_times,p,cond.get_fuzz_type(),cond.ext_offset_size,cond.ext_offset_size_rel1,
                                    cond.ext_offset_size_rel2,cond.ext_offset_size_rel3);
             if let Err(_) = writeln!(cond_file, "{}", condinfo) {eprintln!("can't write conds.csv");}
         }

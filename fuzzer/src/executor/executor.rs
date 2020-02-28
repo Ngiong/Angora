@@ -487,7 +487,6 @@ impl Executor {
         }
       }
 
-
       //Hashing 
       if config::FUNC_REL_TC_SELECT {
         let func_orig_set = func_set.clone();
@@ -523,6 +522,7 @@ impl Executor {
             hashvec.push(0);
           }
         }
+       
         if ! self.func_uniq_call_set.contains(&hashvec) {
           for f1 in &func_orig_set{
             for f2 in &func_orig_set{

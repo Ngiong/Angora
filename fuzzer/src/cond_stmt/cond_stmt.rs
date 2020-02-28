@@ -2,7 +2,6 @@ use super::CondState;
 use crate::fuzz_type::FuzzType;
 use angora_common::{cond_stmt_base::CondStmtBase, defs, tag::TagSeg};
 use std::hash::{Hash, Hasher};
-use priority_queue::PriorityQueue;
 
 #[derive(Debug, Default, Clone)]
 pub struct CondStmt {
@@ -19,7 +18,6 @@ pub struct CondStmt {
     pub state: CondState,
     pub num_minimal_optima: usize,
     pub linear: bool,
-    pub belongs : PriorityQueue<(u32, u32, Vec<TagSeg>, Vec<u32>), u32>, // (input id, basic_priority, offset)
     pub ext_offset_size : u32,
     pub ext_offset_size_rel1 : u32,
     pub ext_offset_size_rel2 : u32,
@@ -58,7 +56,6 @@ impl CondStmt {
             state: CondState::default(),
             num_minimal_optima: 0,
             linear: false,
-            belongs : PriorityQueue::new(),
             ext_offset_size : 0,
             ext_offset_size_rel1 : 0,
             ext_offset_size_rel2 : 0,
@@ -150,12 +147,5 @@ impl CondStmt {
 
     pub fn is_done(&self) -> bool {
         self.base.is_done()
-    }
-    pub fn dump_belongs(&self) -> String {
-      let mut ret = String::new();
-      for (b, p ) in self.belongs.iter(){
-         ret.push_str(&format!("(({}, {}, {}, {}), {}), ",b.0,b.1, b.2.len(), b.3.len(), p));
-      };
-      ret
     }
 }

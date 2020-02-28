@@ -135,15 +135,19 @@ impl NextState for CondStmt {
             },
             CondState::Deterministic => {
                 self.to_offsets_func(depot, func_cmp_map);
+                self.cur_fuzz_times = 1;
             },
             CondState::OffsetFunc => {
                   self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 0);
+                  self.cur_fuzz_times = 1;
             },
             CondState::OffsetRelFunc1 => {
                 self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 1);
+                self.cur_fuzz_times = 1;
             },
             CondState::OffsetRelFunc2 => {
                 self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 2);
+                self.cur_fuzz_times = 1;
             },
             _ => {},
         }
@@ -210,7 +214,6 @@ impl NextState for CondStmt {
            rel_list.push((*k, *v));
            if *k == cmp_func { target_runs = *v;}
         }
-        //rel_list.retain(|x| x.1 > 0);
         
         match status{
           0 => {
@@ -227,33 +230,34 @@ impl NextState for CondStmt {
           },
           _ => {panic!();}
         }
+
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
         }
-        let mut new_offset = vec![];
         let q = match depot.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
         };
         for (i, _p) in q.iter() {
           if cmp_list.contains(&i.base.cmpid) {
-            for ((_bid2, _, boffset2,_), _) in i.belongs.iter(){
-              new_offset = merge_offsets(&new_offset, boffset2);
-            }
+            self.offsets = merge_offsets(&self.offsets, &i.offsets);
+            self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
           }
         }
-        self.offsets = merge_offsets(&self.offsets, &new_offset);
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         match status{
           0 => {
             self.ext_offset_size_rel1 = after_size - before_size;
+            if self.ext_offset_size_rel1 == 0 { warn!("0 size rel extension");}
           },
           1 => {
             self.ext_offset_size_rel2 = after_size - before_size;
+            if self.ext_offset_size_rel2 == 0 { warn!("0 size rel extension");}
           },
           2 => {
             self.ext_offset_size_rel3 = after_size - before_size;
+            if self.ext_offset_size_rel3 == 0 { warn!("0 size rel extension");}
           },
           _ => {panic!();}
         }

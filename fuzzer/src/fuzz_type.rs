@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Clone, Copy)]
 pub enum FuzzType {
     ExploreFuzz,
@@ -26,4 +28,17 @@ impl FuzzType {
 
 pub fn get_fuzz_type_name(i: usize) -> String {
     FUZZ_TYPE_NAME[i].to_string()
+}
+
+impl fmt::Display for FuzzType {
+  fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      FuzzType::ExploreFuzz => {write!(f, "Explore")},
+      FuzzType::ExploitFuzz => {write!(f, "Exploit")},
+      FuzzType::CmpFnFuzz => {write!(f, "CmpFn")},
+      FuzzType::LenFuzz => {write!(f, "Len")},
+      FuzzType::AFLFuzz => {write!(f, "AFL")},
+      FuzzType::OtherFuzz => {write!(f, "Other")},
+    }
+  }
 }

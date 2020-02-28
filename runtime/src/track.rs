@@ -60,9 +60,9 @@ pub extern "C" fn __dfsw___angora_trace_cmp_tt(
     // ret_label: *mut DfsanLabel
     let lb1 = l4;
     let lb2 = l5;
-    if lb1 == 0 && lb2 == 0 {
-        return;
-    }
+    //if lb1 == 0 && lb2 == 0 {
+    //    return;
+    //}
 
     let op = infer_eq_sign(op, lb1, lb2);
     infer_shape(lb1, size);
@@ -175,9 +175,9 @@ pub extern "C" fn __dfsw___angora_trace_fn_tt(
     let lb1 = unsafe { dfsan_read_label(parg1, arglen1) };
     let lb2 = unsafe { dfsan_read_label(parg2, arglen2) };
 
-    if lb1 == 0 && lb2 == 0 {
-        return;
-    }
+    //if lb1 == 0 && lb2 == 0 {
+    //    return;
+    //}
 
     let arg1 = unsafe { slice::from_raw_parts(parg1 as *mut u8, arglen1) }.to_vec();
     let arg2 = unsafe { slice::from_raw_parts(parg2 as *mut u8, arglen2) }.to_vec();

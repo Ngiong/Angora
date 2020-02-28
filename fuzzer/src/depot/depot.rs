@@ -131,12 +131,9 @@ impl Depot {
                             // Existed, but the new one are better
                             // If the cond is faster than the older one, we prefer the faster,
                             if v.0.speed > cond.speed {
-                                cond.belongs.append(&mut v.0.belongs);
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
-                            } else {
-                                v.0.belongs.append(&mut cond.belongs);
                             }
                         }
                     }
