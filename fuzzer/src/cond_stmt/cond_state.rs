@@ -30,8 +30,17 @@ impl Default for CondState {
 
 impl CondStmt {
     pub fn is_time_expired(&self) -> bool {
-        ((self.state.is_det() || self.state.is_one_byte()) && !self.is_first_time())
-            || self.cur_fuzz_times >= config::LONG_FUZZ_TIME
+      if (self.state.is_det() || self.state.is_one_byte()) && !self.is_first_time() { true } else {
+        match self.state {
+          CondState::Offset => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[0] },
+          CondState::OffsetOpt => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[1] },
+          CondState::OffsetAll => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[2] },
+          CondState::OffsetFunc => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[3] },
+          CondState::OffsetRelFunc1 => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[4] },
+          CondState::OffsetRelFunc2 => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[5] },
+          _ => {false}  //onebyte,unsolvable,timeout,offsetallend
+        }
+      }
     }
 }
 
@@ -111,6 +120,7 @@ pub trait NextState {
 impl NextState for CondStmt {
     fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
                              func_rel_map : &HashMap<u32, HashMap<u32, u32>>) {
+        self.cur_state_fuzz_times = 0;
         match self.state {
             CondState::Offset => {
                 if self.offsets_opt.len() > 0 {
@@ -135,19 +145,15 @@ impl NextState for CondStmt {
             },
             CondState::Deterministic => {
                 self.to_offsets_func(depot, func_cmp_map);
-                self.cur_fuzz_times = 1;
             },
             CondState::OffsetFunc => {
                   self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 0);
-                  self.cur_fuzz_times = 1;
             },
             CondState::OffsetRelFunc1 => {
                 self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 1);
-                self.cur_fuzz_times = 1;
             },
             CondState::OffsetRelFunc2 => {
                 self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 2);
-                self.cur_fuzz_times = 1;
             },
             _ => {},
         }

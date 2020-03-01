@@ -23,7 +23,7 @@ pub const TIME_LIMIT_TRACK: u64 = 12;
 pub const MEM_LIMIT_TRACK: u64 = 0;
 pub const MAX_INVARIABLE_NUM: usize = 16;
 pub const MAX_NUM_MINIMAL_OPTIMA_ALL: usize = 28;
-pub const LONG_FUZZ_TIME: usize = 8;
+//pub const LONG_FUZZ_TIME: usize = 8;
 // based the bit bucket: [1], [2], [3], [4, 7], [8, 15], [16, 31], [32, 127], [128, infinity]
 pub const MAX_COND_ORDER: u32 = 16;
 
@@ -54,3 +54,5 @@ pub const PRIORITIZE : bool = false;
 pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
 pub const FUNC_REL_TC_SELECT : bool = true;
 pub const FUNC_CMP_SIZE : usize = 1;
+
+pub const STATE_LONG_FUZZ_TIME : [u32; 6] = [8,1,1,4,4,4];  //first,second,merged,func,func_rel,runc_rel2
