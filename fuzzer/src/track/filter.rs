@@ -89,7 +89,7 @@ pub fn filter_cond_list(cond_list: &mut Vec<CondStmt>) {
     for cond in cond_list {
         if has_no_taint(cond) || exceed_max_order(cond) || size_not_match(cond) || filter_eof(cond)
         {
-            //cond.is_desirable = false;
+            cond.is_desirable = false;
         } else if cond.base.is_exploitable() {
             // We try to (maximize or random mutate) the values in the exploitable offsets.
             // So we can simply de-dup them by their taint labels.
