@@ -530,7 +530,6 @@ impl Executor {
           self.func_uniq_call_set.insert(hashvec);
         }
       } else {
-        return ;
         for f1 in &func_set{
           for f2 in &func_set{
             *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
