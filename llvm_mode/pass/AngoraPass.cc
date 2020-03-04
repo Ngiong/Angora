@@ -63,7 +63,6 @@ public:
   u32 CidCounter;
   unsigned long int RandSeed = 1;
   bool is_bc;
-  unsigned int inst_ratio = 100;
 
   // Const Variables
   DenseSet<u32> UniqCidSet;
@@ -118,7 +117,6 @@ public:
   bool runOnModule(Module &M) override;
   u32 getInstructionId(Instruction *Inst);
   u32 getRandomBasicBlockId();
-  bool skipBasicBlock();
   u32 getRandomNum();
   void setRandomNumSeed(u32 seed);
   u32 getRandomContextId();
@@ -127,7 +125,7 @@ public:
   void setInsNonSan(Instruction *v);
   Value *castArgType(IRBuilder<> &IRB, Value *V);
   void initVariables(Module &M);
-  void countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_list);
+  void countEdge(Module &M, BasicBlock &BB);
   void visitCallInst(Instruction *Inst, std::vector<u32> &cmp_list);
   void visitInvokeInst(Instruction *Inst, std::vector<u32> &cmp_list);
   void visitCompareFunc(Instruction *Inst, std::vector<u32> &cmp_list);
@@ -147,7 +145,6 @@ char AngoraLLVMPass::ID = 0;
 
 u32 AngoraLLVMPass::getRandomBasicBlockId() { return random() % MAP_SIZE; }
 
-bool AngoraLLVMPass::skipBasicBlock() { return (random() % 100) >= inst_ratio; }
 // http://pubs.opengroup.org/onlinepubs/009695399/functions/rand.html
 u32 AngoraLLVMPass::getRandomNum() {
   RandSeed = RandSeed * 1103515245 + 12345;
@@ -224,13 +221,6 @@ void AngoraLLVMPass::initVariables(Module &M) {
   if (is_bc) {
     errs() << "Input is LLVM bitcode\n";
   }
-
-  char* inst_ratio_str = getenv("ANGORA_INST_RATIO");
-  if (inst_ratio_str){
-     if (sscanf(inst_ratio_str, "%u", &inst_ratio) != 1 || !inst_ratio ||
-        inst_ratio > 100) FATAL("Bad value of ANGORA_INST_RATIO (must be between 1 and 100)");
-  }
-  //errs() << "inst_ratio: " << inst_ratio << "\n";
 
   // set seed
   srandom(ModId);
@@ -375,14 +365,12 @@ void AngoraLLVMPass::initVariables(Module &M) {
 
 // Coverage statistics: AFL's Branch count
 // Angora enable function-call context.
-void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_list) {
+void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB) {
   // LLVMContext &C = M.getContext();
-  if (!FastMode || skipBasicBlock()) return;
+  if (!FastMode ) return;
  
   unsigned int cur_loc = getRandomBasicBlockId();
-  //bb_list.push_back(cur_loc);
   ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
-  //ConstantInt *CurBLoc = ConstantInt::get(Int32Ty, cur_loc + MAP_SIZE);
 
   BasicBlock::iterator IP = BB.getFirstInsertionPt();
   IRBuilder<> IRB(&(*IP));
@@ -402,54 +390,35 @@ void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB, std::vector<u32> &bb_l
   Value *MapPtrIdx = IRB.CreateGEP(MapPtr, BrId);
   setValueNonSan(MapPtrIdx);
 
-  // get Map of block cov
-  //Value *MapBPtrIdx = IRB.CreateGEP(MapPtr, CurBLoc);
-  //setValueNonSan(MapBPtrIdx);
-
   // Increase 1 : IncRet <- Map[idx] + 1
   LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
   setInsNonSan(Counter);
-  //LoadInst *BCounter = IRB.CreateLoad(MapBPtrIdx);
-  //setInsNonSan(BCounter);
 
   // Avoid overflow  //deprecated
-  /*
+  
   Value *CmpOF = IRB.CreateICmpNE(Counter, ConstantInt::get(Int8Ty, -1));
   setValueNonSan(CmpOF);
-  Value *BCmpOF = IRB.CreateICmpNE(BCounter, ConstantInt::get(Int8Ty, -1));
-  setValueNonSan(BCmpOF);
 
   Value *IncVal = IRB.CreateZExt(CmpOF, Int8Ty);
   setValueNonSan(IncVal);
-  Value *BIncVal = IRB.CreateZExt(BCmpOF, Int8Ty);
-  setValueNonSan(BIncVal);
 
   Value *IncRet = IRB.CreateAdd(Counter, IncVal);
   setValueNonSan(IncRet);
-  Value *BIncRet = IRB.CreateAdd(BCounter, BIncVal);
-  setValueNonSan(BIncRet);
-  */
   
+  
+  /*
   Value *IncRet = IRB.CreateAdd(Counter, ConstantInt::get(Int8Ty, 1));
   setValueNonSan(IncRet);
-  //Value *BIncRet = IRB.CreateAdd(BCounter, ConstantInt::get(Int8Ty, 1));
-  //setValueNonSan(BIncRet);
   Value *IsZero = IRB.CreateICmpEQ(IncRet, ConstantInt::get(Int8Ty, 0));
   setValueNonSan(IsZero);
-  //Value *BIsZero = IRB.CreateICmpEQ(BIncRet, ConstantInt::get(Int8Ty, 0));
-  //setValueNonSan(BIsZero);
   Value *IncVal = IRB.CreateZExt(IsZero, Int8Ty);
   setValueNonSan(IncVal);
-  //Value *BIncVal = IRB.CreateZExt(BIsZero, Int8Ty);
-  //setValueNonSan(BIncVal);
   IncRet = IRB.CreateAdd(IncRet, IncVal);
   setValueNonSan(IncRet);
-  //BIncRet = IRB.CreateAdd(BIncRet, BIncVal);
-  //setValueNonSan(BIncRet);
+  */
 
   // Store Back Map[idx]
   IRB.CreateStore(IncRet, MapPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
-  //IRB.CreateStore(BIncRet, MapBPtrIdx)->setMetadata(NoSanMetaId, NoneMetaNode);
 
   Value *NewPrevLoc = NULL;
   if (num_fn_ctx != 0) { // Call-based context
@@ -673,14 +642,13 @@ void AngoraLLVMPass::processCmp(Instruction *Cond, Constant *Cid,
     IRBuilder<> ThenB(BI);
     OpArg[0] = castArgType(ThenB, OpArg[0]);
     OpArg[1] = castArgType(ThenB, OpArg[1]);
-    Value * CondExt = ThenB.CreateZExt(Cond, Int32Ty);
+    Value *CondExt = ThenB.CreateZExt(Cond, Int32Ty);
     setValueNonSan(CondExt);
-    LoadInst * CurCtx = ThenB.CreateLoad(AngoraContext);
+    LoadInst *CurCtx = ThenB.CreateLoad(AngoraContext);
     setInsNonSan(CurCtx);
-    CallInst * ProxyCall =
+    CallInst *ProxyCall =
         ThenB.CreateCall(TraceCmp, {CondExt, Cid, CurCtx, OpArg[0], OpArg[1]});
     setInsNonSan(ProxyCall);
-   
   } else if (TrackMode) {
     Value *SizeArg = ConstantInt::get(Int32Ty, num_bytes);
     u32 predicate = Cmp->getPredicate();
@@ -902,20 +870,15 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     return true;
 
   std::ofstream func;
-  std::string sourceFileName = M.getSourceFileName();
-  if (sourceFileName.at(0) == '.' && sourceFileName.at(1) == '/') {
-    sourceFileName.erase(0,2);
-  }
   if (FastMode){
     func.open("FuncInfo.txt", std::ofstream::out | std::ofstream::app);
   }
   for (auto &F : M) {
-    if (F.isDeclaration() || F.getName().startswith(StringRef("asan.module")))
+    if (F.isDeclaration())
       continue;
 
     addFnWrap(F);
     std::vector<u32> cmp_list;
-    std::vector<u32> bbid_list;
     std::vector<BasicBlock *> bb_list;
     for (auto bb = F.begin(); bb != F.end(); bb++)
       bb_list.push_back(&(*bb));
@@ -934,7 +897,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         if (Inst->getMetadata(NoSanMetaId))
           continue;
         if (Inst == &(*BB->getFirstInsertionPt())) {
-          countEdge(M, *BB, bbid_list); //execute only in fast mode
+          countEdge(M, *BB); //execute only in fast mode
         }
         if (isa<CallInst>(Inst)) {
           visitCallInst(Inst, cmp_list);
@@ -958,19 +921,11 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
       }
       func << "\n";
     }
-    /*
-    if ((bbid_list.size() > 0) && FastMode){
-      func2 << sourceFileName << ":" << F.getName().str() << "," << bbid_list.size() << "\n";
-      for (auto i = bbid_list.begin(); i != bbid_list.end() ; i++){
-         func2 << *i << ",";
-      } 
-      func2 << "\n";
-    }
-    */
   }
   if (FastMode) {
     func.close();
   }
+
   if (is_bc)
     OKF("Max constraint id is %d", CidCounter);
   return true;

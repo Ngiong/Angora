@@ -10,9 +10,7 @@ use std::{
 #[cfg(feature = "unstable")]
 use std::intrinsics::unlikely;
 
-#[allow(dead_code)]
 pub type BranchBuf = [u8; BRANCHES_SIZE];
-//pub type BranchBuf2 = [u8; BRANCHES_SIZE * 2];
 #[cfg(target_pointer_width = "32")]
 type BranchEntry = u32;
 #[cfg(target_pointer_width = "64")]
@@ -24,7 +22,6 @@ const ENTRY_SIZE: usize = 8;
 
 //default memory setting
 type BranchBufPlus = [BranchEntry; BRANCHES_SIZE / ENTRY_SIZE];
-//type BranchBufPlus2 = [BranchEntry; BRANCHES_SIZE * 2 / ENTRY_SIZE];
 
 // Map of bit bucket
 // [1], [2], [3], [4, 7], [8, 15], [16, 31], [32, 127], [128, infinity]
@@ -102,7 +99,7 @@ impl Branches {
                     let idx = base + j;
                     let new_val = buf[idx];
                     if new_val > 0 {
-                        path.push((idx, COUNT_LOOKUP[new_val as usize]));
+                        path.push((idx, COUNT_LOOKUP[new_val as usize]))
                     }
                 }
             }}}
@@ -120,7 +117,7 @@ impl Branches {
             }
         }
         // debug!("count branch table: {}", path.len());
-        path 
+        path
     }
 
     pub fn has_new(&mut self, status: StatusType) -> (bool, bool, usize) {

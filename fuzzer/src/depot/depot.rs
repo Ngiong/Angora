@@ -14,7 +14,7 @@ use std::{
 // https://crates.io/crates/priority-queue
 use priority_queue::PriorityQueue;
 
-pub struct Depot{
+pub struct Depot {
     pub queue: Mutex<PriorityQueue<CondStmt, QPriority>>,
     pub num_inputs: AtomicUsize,
     pub num_hangs: AtomicUsize,
@@ -107,7 +107,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(& self, conds: Vec<CondStmt>) {
+    pub fn add_entries(&self, conds: Vec<CondStmt>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -145,7 +145,7 @@ impl Depot {
         }
     }
 
-    pub fn update_entry(& self, cond: CondStmt) {
+    pub fn update_entry(&self, cond: CondStmt) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {

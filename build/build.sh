@@ -15,7 +15,7 @@ fi
 PREFIX=${PREFIX:-${ROOT_DIR}/bin/}
 
 cargo build
-cargo build --release 
+cargo build --release
 
 rm -rf ${PREFIX}
 mkdir -p ${PREFIX}

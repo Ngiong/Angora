@@ -45,7 +45,6 @@ pub fn fuzz_loop(
             Some(e) => e,
             None => break,
         };
-        debug!("cond : {} / priority : {}", entry.0.base.cmpid, entry.1);
 
         let mut cond = entry.0;
         let priority = entry.1;

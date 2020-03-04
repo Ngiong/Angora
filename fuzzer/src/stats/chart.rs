@@ -23,9 +23,6 @@ pub struct ChartStats {
     num_hangs: Counter,
     num_crashes: Counter,
     
-    num_fuzzed: u32,
-    queuelen: usize,
-
     fuzz: FuzzStats,
     search: SearchStats,
     state: StateStats,
@@ -43,7 +40,7 @@ impl ChartStats {
         }
     }
 
-    pub fn sync_from_local(&mut self, local: &mut LocalStats, num_fuzzed : u32, queuelen: usize) {
+    pub fn sync_from_local(&mut self, local: &mut LocalStats) {
         self.track_time += local.track_time;
         self.num_rounds.count();
 
@@ -56,8 +53,6 @@ impl ChartStats {
 
         st.num_exec += local.num_exec;
         self.num_exec += local.num_exec;
-        self.num_fuzzed = num_fuzzed;
-        self.queuelen = queuelen;
         // if has new
         st.num_inputs += local.num_inputs;
         self.num_inputs += local.num_inputs;
@@ -119,14 +114,14 @@ impl ChartStats {
 
     pub fn mini_log(&self) -> String {
         format!(
-            "{}, {}, {}, {}, {}, {}, {}",
+            "{}, {}, {}, {}, {}, {}",
             self.init_time.0.elapsed().as_secs(),
             self.density.0,
             self.num_inputs.0,
             self.num_hangs.0,
             self.num_crashes.0,
             self.num_exec.0,
-            self.state.mini_state_log()
+            //self.state.mini_state_log()
         )
     }
 
@@ -165,7 +160,6 @@ impl fmt::Display for ChartStats {
     EXECS  |    TOTAL: {},     ROUND: {},     MAX_R: {}
     SPEED  |   PERIOD: {:6}r/s    TIME: {}us, 
     FOUND  |     PATH: {},     HANGS: {},   CRASHES: {}
-    QUEUE  | #_fuzzed: {},      SIZE: {}
 {}
 {}
 {}
@@ -189,7 +183,6 @@ impl fmt::Display for ChartStats {
             self.num_inputs,
             self.num_hangs,
             self.num_crashes,
-            self.num_fuzzed, self.queuelen,
             " -- FUZZ -- ".blue().bold(),
             self.fuzz,
             " -- SEARCH -- ".blue().bold(),

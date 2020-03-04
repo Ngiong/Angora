@@ -36,7 +36,6 @@ pub struct Executor {
     pub has_new_path: bool,
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
-    pub num_fuzzed : u32,
     pub func_rel_map : HashMap<u32, HashMap<u32, u32>>,
     pub func_cmp_map : HashMap<u32, Vec<u32>>,
     pub func_id_map : HashMap<u32, String>,
@@ -112,7 +111,6 @@ impl Executor {
             has_new_path: false,
             global_stats,
             local_stats: Default::default(),
-            num_fuzzed : 0,
             func_rel_map : func_rel_map,
             func_cmp_map : func_cmp_map,
             func_id_map : func_id_map,
@@ -532,6 +530,7 @@ impl Executor {
           self.func_uniq_call_set.insert(hashvec);
         }
       } else {
+        return ;
         for f1 in &func_set{
           for f2 in &func_set{
             *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
@@ -541,16 +540,10 @@ impl Executor {
     }
 
     pub fn update_log(&mut self) {
-        let len;
-        {
-          let q = match self.depot.queue.lock(){ Ok(guard)=> guard,
-                                      Err(poisoned) => poisoned.into_inner()};
-          len = q.len();
-        }
         self.global_stats
             .write()
             .unwrap()
-            .sync_from_local(&mut self.local_stats, self.num_fuzzed, len);
+            .sync_from_local(&mut self.local_stats);
 
         self.t_conds.clear();
         self.tmout_cnt = 0;

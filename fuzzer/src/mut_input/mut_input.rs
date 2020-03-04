@@ -41,7 +41,6 @@ impl MutInput {
         let len = input.len();
         let mut mut_input = MutInput::new();
         if offsets.len() == 0 {return mut_input}
-        assert!( offsets.len() != 0);
         for off in offsets {
             let begin = off.begin as usize;
             let end = off.end as usize;

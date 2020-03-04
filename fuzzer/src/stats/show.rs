@@ -28,8 +28,7 @@ pub fn show_stats(
     {
         let s = stats.read().expect("Could not read from stats.");
         println!("{}", *s);
-        let s2 = s.mini_log();
-        writeln!(log_f, "{}", s2).expect("Could not write minilog.");
+        writeln!(log_f, "{}", s.mini_log()).expect("Could not write minilog.");
         write!(
             log_s,
             "{}",

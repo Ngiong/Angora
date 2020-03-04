@@ -18,7 +18,7 @@ pub fn read_and_parse(
         if is_pin_mode {
             get_log_data_pin(out_f)?
         } else {
-            get_log_data(out_f)? 
+            get_log_data(out_f)?
         }
     };
 
@@ -91,42 +91,6 @@ pub fn load_track_data(
         }
     };
 
-    if false {
-    //cheong
-    let cond_out_path = &out_f.parent().unwrap().parent().unwrap().join("conds.txt");
-    let exists = &cond_out_path.exists();
-    let file = std::fs::OpenOptions::new().read(true).write(true).create(true).open(cond_out_path).unwrap();
-    let mut writer = std::io::BufWriter::new(&file);
- 
-    if !exists { match writeln!(&mut writer,
-                                "cmpid,input,# of offsets,offsets len,op,context,args,condition,lb1,lb2"){
-                 Ok(_) => {()},
-                 Err(_) => {println!("debug, can't write");}}}
- 
-    for cond in &cond_list{
-           // println!("{:?}", cond.base);
-            let op = cond.base.op;
-            if (op & defs::COND_BASIC_MASK) == defs::COND_SW_OP {
-                // println!("SW: cmpid {}, context {}, order{}, condition {}",
-                // cond.base.cmpid, cond.base.context, cond.base.order, cond.base.condition);
-            } else {
-                let mut offlen = 0;
-                for off in &cond.offsets{
-                   offlen = offlen + off.end - off.begin;
-                }
-                match writeln!(&mut writer,
-                    "{},{},{},{},{},{},({}, {}),{},{},{}",
-                    cond.base.cmpid, cond.base.belong, cond.offsets.len(),offlen,
-                    cond.base.op,
-                    cond.base.context,
-                    cond.base.arg1,
-                    cond.base.arg2,
-                    cond.base.condition, cond.base.lb1, cond.base.lb2
-                ) { Ok(_) => {()}, Err(_) => {println!("can't write");}
-                }
-            }
-    }
-    }
     for cond in cond_list.iter_mut() {
         cond.base.belong = id;
         cond.speed = speed;

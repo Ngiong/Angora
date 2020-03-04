@@ -7,8 +7,7 @@ use std::env;
 use std::process;
 
 pub type BranchBuf = [u8; BRANCHES_SIZE];
-//pub type BranchBuf2 = [u8; BRANCHES_SIZE * 2];
-static mut __ANGORA_AREA_INITIAL: BranchBuf = [255; BRANCHES_SIZE ];
+static mut __ANGORA_AREA_INITIAL: BranchBuf = [255; BRANCHES_SIZE];
 
 #[no_mangle]
 pub static mut __angora_area_ptr: *const u8 = unsafe{  &__ANGORA_AREA_INITIAL[0] as *const u8 };
