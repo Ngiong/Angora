@@ -5,9 +5,6 @@ use clap::{App, Arg};
 extern crate angora;
 extern crate angora_common;
 use angora::fuzz_main;
-use std::thread;
-
-const STACK_SIZE: usize = 128 * 1024 * 1024;
 
 fn main() {
     let matches = App::new("angora-fuzzer")
