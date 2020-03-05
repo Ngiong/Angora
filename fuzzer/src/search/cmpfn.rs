@@ -36,7 +36,9 @@ impl<'a> FnFuzz<'a> {
             let last = self.handler.cond.offsets.last().unwrap();
             let off = last.begin as usize;
             let size = last.end as usize - off;
-            self.handler.buf.remove(off);
+            if off < self.handler.buf.len(){
+              self.handler.buf.remove(off);
+            }
             if size > 1 {
                 self.handler.cond.offsets.last_mut().unwrap().end = last.end - 1;
             } else {
