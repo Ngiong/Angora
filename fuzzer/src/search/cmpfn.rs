@@ -55,6 +55,13 @@ impl<'a> FnFuzz<'a> {
             );
             return;
         }
+        if self.handler.cond.variables.len() < len {
+          error!(
+              "magic length is less than input length. cond: {:?}",
+              self.handler.cond
+          );
+          return;
+        }
         let output = self.handler.cond.variables.split_off(len); // mapping input
         let input_len = input.val_len();
         if input_len < len {

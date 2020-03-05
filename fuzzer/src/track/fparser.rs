@@ -1,5 +1,4 @@
 use super::filter;
-use std::io::Write;
 use super::load_pin_data::get_log_data_pin;
 use crate::{
     cond_stmt::{CondState, CondStmt},

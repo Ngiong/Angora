@@ -114,14 +114,14 @@ impl ChartStats {
 
     pub fn mini_log(&self) -> String {
         format!(
-            "{}, {}, {}, {}, {}, {}",
+            "{}, {}, {}, {}, {}, {}, {}",
             self.init_time.0.elapsed().as_secs(),
             self.density.0,
             self.num_inputs.0,
             self.num_hangs.0,
             self.num_crashes.0,
             self.num_exec.0,
-            //self.state.mini_state_log()
+            self.state.mini_state_log()
         )
     }
 
