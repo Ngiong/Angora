@@ -119,7 +119,7 @@ impl CondStmt {
 
     pub fn mark_as_done(&mut self) {
         self.base.condition = defs::COND_DONE_ST;
-        self.clear();
+        //self.clear();
     }
 
     pub fn clear(&mut self) {
