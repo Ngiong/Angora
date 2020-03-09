@@ -3,7 +3,8 @@ use std::fmt;
 use std::sync::Arc;
 use std::collections::HashMap;
 use crate::depot::Depot;
-use angora_common::{config, defs};
+use angora_common::{config, defs, tag::TagSeg};
+use rand::{thread_rng, Rng};
 use std;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -181,6 +182,7 @@ impl NextState for CondStmt {
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         self.state = CondState::OffsetFunc;
+        let mut orig_offset = self.offsets.clone();
         if func_cmp_map.len() == 0 { return; }
         let mut cmp_list : Vec<u32> = Vec::new();
         //get function which contain target cmp
@@ -194,18 +196,34 @@ impl NextState for CondStmt {
         for (i, _p) in iter {
           if self.base.belong != i.base.belong {continue;}
           if cmp_list.contains(&i.base.cmpid) {
-            self.offsets = merge_offsets(&self.offsets, &i.offsets);
-            self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+            if config::FUNC_REL_RANDOM {
+              orig_offset = merge_offsets(&orig_offset, &i.offsets);
+              orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
+            } else {
+              self.offsets = merge_offsets(&self.offsets, &i.offsets);
+              self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+            }
           }
         }
-        let after_size = self.get_offset_len() + self.get_offset_opt_len();
-        self.ext_offset_size = after_size - before_size;
+        if config::FUNC_REL_RANDOM {
+          let extend_len = offset_len(&orig_offset) - before_size;
+          let mut new_offset = vec![];
+          let input_len = depot.get_input_buf(self.base.belong as usize).len();
+          for _i in 0..extend_len {
+            let random_off = thread_rng().gen_range(0, input_len) as u32;
+            let random_byte = vec![TagSeg {sign : false, begin : random_off, end : random_off+ 1}];
+            new_offset= merge_offsets(&new_offset, &random_byte);
+          }
+          self.offsets = merge_offsets(&self.offsets, &new_offset);
+        }
+        self.ext_offset_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
     }
  
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>, status : u8){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
-        if func_cmp_map.len() == 0 {return ; }
+        if func_cmp_map.len() == 0 {return ;}
+        let mut orig_offset = self.offsets.clone();
         let mut cmp_list : Vec<u32> = Vec::new();
         let mut cmp_func : u32 = 0;
         //get func which contains the cmp.
@@ -247,9 +265,25 @@ impl NextState for CondStmt {
         };
         for (i, _p) in q.iter() {
           if cmp_list.contains(&i.base.cmpid) {
-            self.offsets = merge_offsets(&self.offsets, &i.offsets);
-            self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+            if config::FUNC_REL_RANDOM {
+              orig_offset = merge_offsets(&orig_offset, &i.offsets);
+              orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
+            } else {
+              self.offsets = merge_offsets(&self.offsets, &i.offsets);
+              self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+            }
           }
+        }
+        if config::FUNC_REL_RANDOM {
+          let extend_len = offset_len(&orig_offset) - before_size;
+          let mut new_offset = vec![];
+          let input_len = depot.get_input_buf(self.base.belong as usize).len();
+          for _i in 0..extend_len {
+            let random_off = thread_rng().gen_range(0, input_len) as u32;
+            let random_byte = vec![TagSeg {sign : false, begin : random_off, end : random_off + 1}];
+            new_offset = merge_offsets(&new_offset, &random_byte);
+          }
+          self.offsets = merge_offsets(&self.offsets, &new_offset);
         }
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         match status{

@@ -54,6 +54,17 @@ pub fn merge_offsets(v1: &Vec<TagSeg>, v2: &Vec<TagSeg>) -> Vec<TagSeg> {
     v
 }
 
+pub fn offset_len(offset : &Vec<TagSeg>) -> u32 {
+  let mut len = 0;
+  for off in offset {
+    let end = off.end;
+    let bgn = off.begin;
+    let diff = if end > bgn { end - bgn } else { 0};
+    len += diff;
+  }
+  len
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,6 +1,7 @@
 use super::CondState;
 use crate::fuzz_type::FuzzType;
 use angora_common::{cond_stmt_base::CondStmtBase, defs, tag::TagSeg};
+use crate::mut_input::offsets::offset_len;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Default, Clone)]
@@ -88,25 +89,11 @@ impl CondStmt {
         }
     }
     pub fn get_offset_len(&self) -> u32 {
-      let mut len = 0;
-      for i in 0..self.offsets.len() {
-        let end = self.offsets[i].end;
-        let bgn = self.offsets[i].begin;
-        let diff = if end > bgn {end - bgn} else { 0} ;
-        len += diff;
-      }
-      len
+      offset_len(&self.offsets)
     }
 
     pub fn get_offset_opt_len(&self) -> u32 {
-      let mut len = 0;
-      for i in 0..self.offsets_opt.len() {
-        let end = self.offsets_opt[i].end;
-        let bgn = self.offsets_opt[i].begin;
-        let diff = if end > bgn {end - bgn} else { 0} ;
-        len += diff;
-      }
-      len
+      offset_len(&self.offsets_opt)
     }
 
     pub fn is_tainted(&self) -> bool {
@@ -150,4 +137,5 @@ impl CondStmt {
     pub fn is_done(&self) -> bool {
         self.base.is_done()
     }
+
 }

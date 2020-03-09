@@ -51,6 +51,7 @@ pub const FUNC_REL_HIGH_THRESHOLD2 : f64 = 0.5;
 pub const FUNC_REL_HIGH_THRESHOLD3 : f64 = 0.1;
 pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
 pub const FUNC_REL_TC_SELECT : bool = true;
+pub const FUNC_REL_RANDOM : bool = true;
 pub const FUNC_CMP_SIZE : usize = 1;
 
 pub const STATE_LONG_FUZZ_TIME : [u32; 6] = [8,1,1,8,8,8];  //first,second,merged,func,func_rel,runc_rel2
