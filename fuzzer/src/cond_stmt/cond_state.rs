@@ -116,6 +116,7 @@ pub trait NextState {
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>, status : u8);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
+    fn get_random_offsets( input_len : u32, extend_len : u32) -> Vec<TagSeg>; 
 }
 
 impl NextState for CondStmt {
@@ -178,6 +179,19 @@ impl NextState for CondStmt {
         debug!("to_all_end");
         self.state = CondState::OffsetAllEnd;
     }
+
+    fn get_random_offsets(input_len : u32, extend_len : u32) -> Vec<TagSeg> {
+      let sel_prob : f32 = (input_len as f32 ) / (extend_len as f32);
+      let mut selected = vec![];
+      let mut rng = thread_rng();
+      for i in 0..input_len  {
+        let x : f32 = rng.gen();
+        if x < sel_prob {
+          selected.push(TagSeg {sign : false, begin : i, end : i + 1});
+        }
+      }
+      selected
+    }
     
     fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
@@ -189,32 +203,29 @@ impl NextState for CondStmt {
         for (_k, v) in func_cmp_map {
           if v.contains(&self.base.cmpid) { cmp_list = v.clone(); break; }
         }
-        let q = match depot.queue.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}};
-        let iter = q.iter();
-        for (i, _p) in iter {
-          if self.base.belong != i.base.belong {continue;}
-          if cmp_list.contains(&i.base.cmpid) {
-            if config::FUNC_REL_RANDOM {
-              orig_offset = merge_offsets(&orig_offset, &i.offsets);
-              orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
-            } else {
-              self.offsets = merge_offsets(&self.offsets, &i.offsets);
-              self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+        {
+          let q = match depot.queue.lock() {
+              Ok(guard) => guard,
+              Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}};
+          let iter = q.iter();
+          for (i, _p) in iter {
+            if self.base.belong != i.base.belong {continue;}
+            if cmp_list.contains(&i.base.cmpid) {
+              if config::FUNC_REL_RANDOM {
+                orig_offset = merge_offsets(&orig_offset, &i.offsets);
+                orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
+              } else {
+                self.offsets = merge_offsets(&self.offsets, &i.offsets);
+                self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+              }
             }
           }
         }
         if config::FUNC_REL_RANDOM {
           let extend_len = offset_len(&orig_offset) - before_size;
-          let mut new_offset = vec![];
-          let input_len = depot.get_input_buf(self.base.belong as usize).len();
-          for _i in 0..extend_len {
-            let random_off = thread_rng().gen_range(0, input_len) as u32;
-            let random_byte = vec![TagSeg {sign : false, begin : random_off, end : random_off+ 1}];
-            new_offset= merge_offsets(&new_offset, &random_byte);
-          }
-          self.offsets = merge_offsets(&self.offsets, &new_offset);
+          let input_len = depot.get_input_buf(self.base.belong as usize).len() as u32;
+          let new_random_offset = Self::get_random_offsets(input_len, extend_len);
+          self.offsets = merge_offsets(&self.offsets, &new_random_offset);
         }
         self.ext_offset_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
     }
@@ -259,31 +270,28 @@ impl NextState for CondStmt {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
         }
-        let q = match depot.queue.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
-        };
-        for (i, _p) in q.iter() {
-          if cmp_list.contains(&i.base.cmpid) {
-            if config::FUNC_REL_RANDOM {
-              orig_offset = merge_offsets(&orig_offset, &i.offsets);
-              orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
-            } else {
-              self.offsets = merge_offsets(&self.offsets, &i.offsets);
-              self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+        {
+          let q = match depot.queue.lock() {
+              Ok(guard) => guard,
+              Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
+          };
+          for (i, _p) in q.iter() {
+            if cmp_list.contains(&i.base.cmpid) {
+              if config::FUNC_REL_RANDOM {
+                orig_offset = merge_offsets(&orig_offset, &i.offsets);
+                orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
+              } else {
+                self.offsets = merge_offsets(&self.offsets, &i.offsets);
+                self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
+              }
             }
           }
         }
         if config::FUNC_REL_RANDOM {
           let extend_len = offset_len(&orig_offset) - before_size;
-          let mut new_offset = vec![];
-          let input_len = depot.get_input_buf(self.base.belong as usize).len();
-          for _i in 0..extend_len {
-            let random_off = thread_rng().gen_range(0, input_len) as u32;
-            let random_byte = vec![TagSeg {sign : false, begin : random_off, end : random_off + 1}];
-            new_offset = merge_offsets(&new_offset, &random_byte);
-          }
-          self.offsets = merge_offsets(&self.offsets, &new_offset);
+          let input_len = depot.get_input_buf(self.base.belong as usize).len() as u32;
+          let new_random_offset = Self::get_random_offsets(input_len, extend_len);
+          self.offsets = merge_offsets(&self.offsets, &new_random_offset);
         }
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         match status{
