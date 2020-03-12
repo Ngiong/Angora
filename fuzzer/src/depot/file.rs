@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn get_file_name(dir: &Path, id: usize) -> PathBuf {
-    let file_name = format!("id:{:06}", id);
+pub fn get_file_name(dir: &Path, id: usize, cmpid: u32, belong : u32) -> PathBuf {
+    let file_name = format!("id_{:06}_cmpid_{:06}_belong_{:06}", id, cmpid, belong);
     dir.join(file_name)
 }
 

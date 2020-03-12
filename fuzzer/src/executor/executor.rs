@@ -211,7 +211,7 @@ impl Executor {
         skip |= self.check_invariable(output, cond);
         self.check_consistent(output, cond);
 
-        self.do_if_has_new(buf, status, explored, cond.base.cmpid);
+        self.do_if_has_new(buf, status, explored, cond.base.cmpid, cond.base.belong);
         status = self.check_timeout(status, cond);
 
         if skip {
@@ -221,7 +221,7 @@ impl Executor {
         (status, output)
     }
 
-    fn try_unlimited_memory(&mut self, buf: &Vec<u8>, cmpid: u32) -> bool {
+    fn try_unlimited_memory(&mut self, buf: &Vec<u8>, cmpid: u32, belong : u32) -> bool {
         let mut skip = false;
         self.branches.clear_trace();
         if self.cmd.is_stdin {
@@ -241,13 +241,13 @@ impl Executor {
             );
             // crash or hang
             if self.branches.has_new(unmem_status).0 {
-                self.depot.save(unmem_status, &buf, cmpid);
+                self.depot.save(unmem_status, &buf, cmpid, belong);
             }
         }
         skip
     }
 
-    fn do_if_has_new(&mut self, buf: &Vec<u8>, status: StatusType, _explored: bool, cmpid: u32) {
+    fn do_if_has_new(&mut self, buf: &Vec<u8>, status: StatusType, _explored: bool, cmpid: u32, belong : u32) {
         // new edge: one byte in bitmap
         let (has_new_path, has_new_edge, edge_num) = self.branches.has_new(status);
 
@@ -256,7 +256,7 @@ impl Executor {
         if has_new_path {
             self.has_new_path = true;
             self.local_stats.find_new(&status);
-            let id = self.depot.save(status, &buf, cmpid);
+            let id = self.depot.save(status, &buf, cmpid, belong);
 
             if status == StatusType::Normal {
                 self.local_stats.avg_edge_num.update(edge_num as f32);
@@ -272,7 +272,7 @@ impl Executor {
                     );
                     return;
                 }
-                let crash_or_tmout = self.try_unlimited_memory(buf, cmpid);
+                let crash_or_tmout = self.try_unlimited_memory(buf, cmpid, belong);
                 if !crash_or_tmout {
                     let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
@@ -296,14 +296,14 @@ impl Executor {
     pub fn run(&mut self, buf: &Vec<u8>, cond: &mut cond_stmt::CondStmt) -> StatusType {
         self.run_init();
         let status = self.run_inner(buf);
-        self.do_if_has_new(buf, status, false, 0);
+        self.do_if_has_new(buf, status, false, 0, cond.base.belong);
         self.check_timeout(status, cond)
     }
 
     pub fn run_sync(&mut self, buf: &Vec<u8>) {
         self.run_init();
         let status = self.run_inner(buf);
-        self.do_if_has_new(buf, status, false, 0);
+        self.do_if_has_new(buf, status, false, 0, 0);
     }
 
     fn run_init(&mut self) {
