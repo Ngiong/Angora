@@ -73,7 +73,7 @@ impl StateStats {
             CondState::OffsetFunc => {
                self.func.count(is_done);
             },
-            CondState::OffsetRelFunc1 | CondState::OffsetRelFunc2 => {
+            CondState::OffsetRelFunc => {
                self.func_rel.count(is_done);
             }
         }

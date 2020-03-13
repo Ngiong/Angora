@@ -230,10 +230,9 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     write!(buff," {}", s).expect("Could not write to param file");
   }
   writeln!(buff,"").expect("Could nout write to param file");
-  write!(buff, ", MAP_SIZE : {}, H_THRESHOLD1: {}, H_THRESHOLD2: {}, H_THRESHOLD3: {}",
+  write!(buff, ", MAP_SIZE : {}, H_THRESHOLD: {}",
          config::MAP_SIZE_POW2, 
-         config::FUNC_REL_HIGH_THRESHOLD1, config::FUNC_REL_HIGH_THRESHOLD2,
-         config::FUNC_REL_HIGH_THRESHOLD3).expect("Could not write to param file");
+         config::FUNC_REL_HIGH_THRESHOLD).expect("Could not write to param file");
 }
 
 fn create_stats_file_and_write_pid(angora_out_dir: &PathBuf) -> PathBuf {

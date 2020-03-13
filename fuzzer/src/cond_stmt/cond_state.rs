@@ -14,8 +14,7 @@ pub enum CondState {
     OffsetAll,
     OffsetAllEnd,
     OffsetFunc,
-    OffsetRelFunc1,
-    OffsetRelFunc2,
+    OffsetRelFunc,
 
     OneByte,
     Unsolvable,
@@ -37,8 +36,6 @@ impl CondStmt {
           CondState::OffsetOpt => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[1] },
           CondState::OffsetAll => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[2] },
           CondState::OffsetFunc => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[3] },
-          CondState::OffsetRelFunc1 => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[4] },
-          CondState::OffsetRelFunc2 => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[5] },
           _ => {false}  //onebyte,unsolvable,timeout,offsetallend
         }
       }
@@ -94,8 +91,7 @@ impl fmt::Display for CondState {
       CondState::OffsetAll => {write!(f, "OffsetAll")},
       CondState::OffsetAllEnd => {write!(f, "OffsetAllEnd")},
       CondState::OffsetFunc => {write!(f, "OffsetFunc")},
-      CondState::OffsetRelFunc1 => {write!(f, "OffsetRelFunc1")}, 
-      CondState::OffsetRelFunc2 => {write!(f, "OffsetRelFunc2")}, 
+      CondState::OffsetRelFunc => {write!(f, "OffsetRelFunc")}, 
       CondState::OneByte => {write!(f, "OneByte")},
       CondState::Unsolvable => {write!(f, "Unsolvable")},
       CondState::Deterministic => {write!(f, "Det")},
@@ -113,7 +109,7 @@ pub trait NextState {
     fn to_det(&mut self);
     fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>);
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
-                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>, status : u8);
+                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
     fn get_random_offsets( input_len : u32, extend_len : u32) -> Vec<TagSeg>; 
@@ -149,13 +145,7 @@ impl NextState for CondStmt {
                 self.to_offsets_func(depot, func_cmp_map);
             },
             CondState::OffsetFunc => {
-                  self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 0);
-            },
-            CondState::OffsetRelFunc1 => {
-                self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 1);
-            },
-            CondState::OffsetRelFunc2 => {
-                self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map, 2);
+                  self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
             },
             _ => {},
         }
@@ -231,7 +221,7 @@ impl NextState for CondStmt {
     }
  
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
-                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>, status : u8){
+                                      func_rel_map : &HashMap<u32, HashMap<u32, u32>>){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         if func_cmp_map.len() == 0 {return ;}
         let mut orig_offset = self.offsets.clone();
@@ -249,22 +239,8 @@ impl NextState for CondStmt {
            rel_list.push((*k, *v));
            if *k == cmp_func { target_runs = *v;}
         }
-        
-        match status{
-          0 => {
-            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD1);
-            self.state = CondState::OffsetRelFunc1;
-          },
-          1 => {
-            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD2);
-            self.state = CondState::OffsetRelFunc2;
-          },
-          2 => {
-            rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD3);
-            self.state = CondState::OffsetAllEnd;
-          },
-          _ => {panic!();}
-        }
+        rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+        self.state = CondState::OffsetRelFunc;
 
         for (rel_func, _rel) in rel_list {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
@@ -294,21 +270,8 @@ impl NextState for CondStmt {
           self.offsets = merge_offsets(&self.offsets, &new_random_offset);
         }
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
-        match status{
-          0 => {
-            self.ext_offset_size_rel1 = after_size - before_size;
-            if self.ext_offset_size_rel1 == 0 { warn!("0 size rel extension");}
-          },
-          1 => {
-            self.ext_offset_size_rel2 = after_size - before_size;
-            if self.ext_offset_size_rel2 == 0 { warn!("0 size rel extension");}
-          },
-          2 => {
-            self.ext_offset_size_rel3 = after_size - before_size;
-            if self.ext_offset_size_rel3 == 0 { warn!("0 size rel extension");}
-          },
-          _ => {panic!();}
-        }
+        self.ext_offset_size_rel = after_size - before_size;
+        if self.ext_offset_size_rel == 0 { warn!("0 size rel extension");}
     }
 
     fn to_unsolvable(&mut self) {

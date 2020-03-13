@@ -21,9 +21,7 @@ pub struct CondStmt {
     pub num_minimal_optima: usize,
     pub linear: bool,
     pub ext_offset_size : u32,
-    pub ext_offset_size_rel1 : u32,
-    pub ext_offset_size_rel2 : u32,
-    pub ext_offset_size_rel3 : u32,
+    pub ext_offset_size_rel : u32,
 }
 
 impl PartialEq for CondStmt {
@@ -60,9 +58,7 @@ impl CondStmt {
             num_minimal_optima: 0,
             linear: false,
             ext_offset_size : 0,
-            ext_offset_size_rel1 : 0,
-            ext_offset_size_rel2 : 0,
-            ext_offset_size_rel3 : 0,
+            ext_offset_size_rel : 0,
         }
     }
 
