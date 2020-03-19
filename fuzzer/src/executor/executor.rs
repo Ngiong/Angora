@@ -554,6 +554,10 @@ impl Executor {
 impl Drop for Executor {
   fn drop(&mut self) {
     if self.func_rel_map.len() == 0 || self.cid == 255 { return;}
+    let time_path = self.cmd.tmp_dir.as_path().parent().unwrap().join(format!("func_time_{}", self.cid));
+    let mut time_file = OpenOptions::new().write(true).create(true)
+                    .open(time_path).expect("can't open time_file");
+    if let Err(_) = writeln!(time_file, "Func rel overhead (in millis) : {}", self.global_stats.read().unwrap().func_time.0.as_millis()) {eprintln!("can't write to func file")};
     info!("dump func rel ..");
     let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap().join("rels");
     if let Err(_) = fs::create_dir(&rel_path) {()}

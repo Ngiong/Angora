@@ -1,7 +1,8 @@
-use crate::{cond_stmt::CondStmt, mut_input::offsets::*};
+use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats};
 use std::fmt;
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::time::Instant;
 use crate::depot::Depot;
 use angora_common::{config, defs, tag::TagSeg};
 use rand::{thread_rng, Rng};
@@ -101,14 +102,17 @@ impl fmt::Display for CondState {
 }
 
 pub trait NextState {
-    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+    fn next_state(&mut self, depot : &Arc<Depot>, local_stat : &mut stats::LocalStats, 
+                    func_cmp_map : &HashMap<u32, Vec<u32>>,
                     func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_offsets_opt(&mut self);
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
     fn to_det(&mut self);
-    fn to_offsets_func(&mut self,depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>);
-    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+    fn to_offsets_func(&mut self,depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, func_cmp_map : &HashMap<u32, Vec<u32>>);
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
+                                      local_stats : &mut stats::LocalStats,
+                                      func_cmp_map : &HashMap<u32, Vec<u32>>,
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
@@ -116,7 +120,9 @@ pub trait NextState {
 }
 
 impl NextState for CondStmt {
-    fn next_state(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+    fn next_state(&mut self, depot : &Arc<Depot>,
+                             local_stats : &mut stats::LocalStats,
+                             func_cmp_map : &HashMap<u32, Vec<u32>>,
                              func_rel_map : &HashMap<u32, HashMap<u32, u32>>) {
         self.cur_state_fuzz_times = 0;
         match self.state {
@@ -131,7 +137,7 @@ impl NextState for CondStmt {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
                 } else {
-                    self.to_offsets_func(depot, func_cmp_map);
+                    self.to_offsets_func(depot, local_stats, func_cmp_map);
                    //self.to_unsolvable();
                 }
             },
@@ -142,10 +148,10 @@ impl NextState for CondStmt {
                 self.to_det();
             },
             CondState::Deterministic => {
-                self.to_offsets_func(depot, func_cmp_map);
+                self.to_offsets_func(depot, local_stats, func_cmp_map);
             },
             CondState::OffsetFunc => {
-                  self.to_offsets_rel_func(depot, func_cmp_map, func_rel_map);
+                  self.to_offsets_rel_func(depot, local_stats, func_cmp_map, func_rel_map);
             },
             _ => {},
         }
@@ -183,8 +189,9 @@ impl NextState for CondStmt {
       selected
     }
     
-    fn to_offsets_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>) {
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats,func_cmp_map : &HashMap<u32, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
+        let start_time = Instant::now();
         self.state = CondState::OffsetFunc;
         let mut orig_offset = self.offsets.clone();
         if func_cmp_map.len() == 0 { return; }
@@ -218,11 +225,15 @@ impl NextState for CondStmt {
           self.offsets = merge_offsets(&self.offsets, &new_random_offset);
         }
         self.ext_offset_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
+        local_stats.func_time += start_time.elapsed().into();
     }
  
-    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>, func_cmp_map : &HashMap<u32, Vec<u32>>,
+    fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
+                                      local_stats : &mut stats::LocalStats,
+                                      func_cmp_map : &HashMap<u32, Vec<u32>>,
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
+        let start_time = Instant::now();
         if func_cmp_map.len() == 0 {return ;}
         let mut orig_offset = self.offsets.clone();
         let mut cmp_list : Vec<u32> = Vec::new();
@@ -272,6 +283,7 @@ impl NextState for CondStmt {
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         self.ext_offset_size_rel = after_size - before_size;
         if self.ext_offset_size_rel == 0 { warn!("0 size rel extension");}
+        local_stats.func_time += start_time.elapsed().into();
     }
 
     fn to_unsolvable(&mut self) {

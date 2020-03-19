@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 #[derive(Default, Serialize)]
 pub struct ChartStats {
+    pub func_time: TimeDuration,
     init_time: TimeIns,
     track_time: TimeDuration,
     density: Average,
@@ -42,6 +43,7 @@ impl ChartStats {
 
     pub fn sync_from_local(&mut self, local: &mut LocalStats) {
         self.track_time += local.track_time;
+        self.func_time += local.func_time;
         self.num_rounds.count();
 
         local.avg_edge_num.sync(&mut self.avg_edge_num);
@@ -155,7 +157,7 @@ impl fmt::Display for ChartStats {
    SUBJECT : {}, OUTDIR : {}
    Function heuristic : {}
 {}
-    TIMING |      RUN: {},   TRACK: {}
+    TIMING |      RUN: {},   TRACK: {},   FUNC : {},
   COVERAGE |     EDGE: {},   DENSITY: {}%
     EXECS  |    TOTAL: {},     ROUND: {},     MAX_R: {}
     SPEED  |   PERIOD: {:6}r/s    TIME: {}us, 
@@ -173,6 +175,7 @@ impl fmt::Display for ChartStats {
             " -- OVERVIEW -- ".blue().bold(),
             self.init_time,
             self.track_time,
+            self.func_time,
             self.avg_edge_num,
             self.density,
             self.num_exec,

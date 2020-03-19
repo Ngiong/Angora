@@ -11,6 +11,7 @@ pub struct LocalStats {
     pub num_crashes: Counter,
 
     pub track_time: TimeDuration,
+    pub func_time: TimeDuration,
     pub start_time: TimeIns,
 
     pub avg_exec_time: SyncAverage,
@@ -31,6 +32,7 @@ impl LocalStats {
 
         self.start_time = Default::default();
         self.track_time = Default::default();
+        self.func_time = Default::default();
     }
 
     pub fn find_new(&mut self, status: &StatusType) {

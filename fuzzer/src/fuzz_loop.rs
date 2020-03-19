@@ -73,7 +73,8 @@ pub fn fuzz_loop(
                 FuzzType::ExploreFuzz => {
                     if handler.cond.is_time_expired() {
                       //If it is not the first time, move to next state
-                        handler.cond.next_state(&depot, &handler.executor.func_cmp_map, &handler.executor.func_rel_map);
+                        handler.cond.next_state(&depot, &mut handler.executor.local_stats,
+                                                        &handler.executor.func_cmp_map, &handler.executor.func_rel_map);
                     }
                     if handler.cond.state.is_one_byte() { //Only one byte to fuzz for this condition.
                         OneByteFuzz::new(handler).run();
