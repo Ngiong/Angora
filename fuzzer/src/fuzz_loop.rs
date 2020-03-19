@@ -64,6 +64,8 @@ pub fn fuzz_loop(
 
         let buf = depot.get_input_buf(belong_input);
 
+        cond.belong_len = buf.len();
+
         {
             let fuzz_type = cond.get_fuzz_type();
             let handler = SearchHandler::new(running.clone(), &mut executor, &mut cond, buf);

@@ -20,6 +20,7 @@ pub struct CondStmt {
     pub state: CondState,
     pub num_minimal_optima: usize,
     pub linear: bool,
+    pub belong_len : usize,
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
 }
@@ -57,6 +58,7 @@ impl CondStmt {
             state: CondState::default(),
             num_minimal_optima: 0,
             linear: false,
+            belong_len : 0,
             ext_offset_size : 0,
             ext_offset_size_rel : 0,
         }
