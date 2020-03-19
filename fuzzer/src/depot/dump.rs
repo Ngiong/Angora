@@ -18,7 +18,7 @@ impl Drop for Depot {
         let mut cond_file = OpenOptions::new().write(true).create(true)
                                .open(cpath).expect("Can't open conds.csv");
         if let Err(_) = writeln!(cond_file,
-              "cmpid,context,belong,condition,state,# of offsets,total offset len,fuzz_times,priority,fuzz_type,extended_size, extended_size_rel")
+              "cmpid,context,belong,condition,state,# of offsets,total offset len,fuzz_times,priority,fuzz_type,input_len, extended_size, extended_size_rel")
           {eprintln!("can't write conds.csv")}
 
         let q = self.queue.lock().unwrap();
@@ -49,9 +49,10 @@ impl Drop for Depot {
                 .unwrap();
             }
   
-            let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{},{}",cond.base.cmpid,cond.base.context,cond.base.belong,
+            let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{},{},{}",cond.base.cmpid,cond.base.context,cond.base.belong,
                                    cond.base.condition,cond.state,cond.offsets.len(),cond.get_offset_len(),
-                                   cond.fuzz_times,p,cond.get_fuzz_type(),cond.ext_offset_size,cond.ext_offset_size_rel);
+                                   cond.fuzz_times,p,cond.get_fuzz_type(), cond.belong_len,
+                                   cond.ext_offset_size,cond.ext_offset_size_rel);
             if let Err(_) = writeln!(cond_file, "{}", condinfo) {eprintln!("can't write conds.csv");}
         }
     }
