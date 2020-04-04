@@ -409,8 +409,7 @@ impl Executor {
             self.cmd.mode.is_pin_mode(),
             self.cmd.enable_exploitation,
         );
-        if let Err(_) = fs::copy(&track_path,
-                 &taint_path) {
+        if let Err(_) = fs::copy(&track_path, &taint_path) {
           println!("can't copy taint file");
         }
         self.local_stats.track_time += t_now.into();

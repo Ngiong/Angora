@@ -207,7 +207,10 @@ impl NextState for CondStmt {
         let taint_file = Path::new(&taint_file_path);
         let log_data = match get_log_data(taint_file) {
           Ok(s) => {s},
-          Err(_) => {panic!("Can't get log data : cmpid : {}, belong: {}", self.base.cmpid, self.base.belong)},
+          Err(_) => {
+            error!("Can't get log data : cmpid : {}, belong: {}", self.base.cmpid, self.base.belong);
+            return;
+          },
         };
         let mut new_offsets = vec![];
         let mut lb_set = HashSet::new();
@@ -268,7 +271,14 @@ impl NextState for CondStmt {
         }
         let taint_file_path = taint_dir.clone().join(format!("taints_{}", self.base.belong));
         let taint_file = Path::new(&taint_file_path);
-        let log_data = get_log_data(taint_file).ok().unwrap();
+
+        let log_data = match get_log_data(taint_file) {
+          Ok(s) => {s},
+          Err(_) => {
+            error!("Can't get log data : cmpid : {}, belong: {}", self.base.cmpid, self.base.belong);
+            return;
+          },
+        };
         let mut new_offsets = vec![];
         let mut lb_set = HashSet::new();
         for cond_base in log_data.cond_list.iter() {
