@@ -1,6 +1,7 @@
 use super::*;
 use crate::{cond_stmt::CondStmt, executor::StatusType};
 use rand;
+use rand::{thread_rng,Rng};
 use std::{
     fs,
     io::prelude::*,
@@ -142,15 +143,15 @@ impl Depot {
                             let swap = if config::MUTATE_TC_SELECT {
                               let mut cmp_list = vec![];
                               let mut cmp_func : u32 = 0;
-                              for (k, v) in func_cmp_map{
-                                if v.contains(&cond.base.cmpid) {cmp_func = *k; break;}
+                              for (k, v2) in func_cmp_map{
+                                if v2.contains(&cond.base.cmpid) {cmp_func = *k; break;}
                               };
                               let rels : &HashMap<u32, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
                               let mut rel_list : Vec<(u32, u32)> = Vec::new();
                               let mut target_runs = 0;
-                              for (k, v) in rels{
-                                rel_list.push((*k, *v));
-                                if *k == cmp_func { target_runs = *v;}
+                              for (k, v2) in rels{
+                                rel_list.push((*k, *v2));
+                                if *k == cmp_func { target_runs = *v2;}
                               }
                               rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
                               for (rel_func, _rel) in rel_list {
@@ -160,16 +161,24 @@ impl Depot {
                               let func_rel_score = cmp_list.len() / conds_size;
                               cond.func_rel_score = func_rel_score;
                               func_rel_score > v.0.func_rel_score
+                            } else if config::MUTATE_RANDOM  {
+                              let mut rng = thread_rng();
+                              let x : f32 = rng.gen();
+                              (1.0 / (v.0.belongs as f32)) > x
                             } else { v.0.speed > cond.speed };
                             if swap {
+                                cond.belongs = 1;
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
+                            } else {
+                              v.0.belongs += 1;
                             }
                         }
                     }
                 } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
+                    cond.belongs = 1;
                     q.push(cond, priority);
                 }
             }

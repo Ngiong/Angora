@@ -225,9 +225,9 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     Ok(a) => a,
     Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
   };
-  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, tc selection : {} ",
+  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, func_rel cal tc selection : {}, tc selection with func_rel : {}, tc selection random : {} ",
                out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0,
-               config::FUZZ_TIME_OUT / 3600, config::FUNC_REL_TC_SELECT)
+               config::FUZZ_TIME_OUT / 3600, config::FUNC_REL_TC_SELECT, config::MUTATE_TC_SELECT, config::MUTATE_RANDOM)
          .expect("Could not write to param file");
   writeln!(buff, "").expect("Could not write");
   for s in &command.main.1{
