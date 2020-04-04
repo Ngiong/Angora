@@ -140,9 +140,10 @@ impl NextState for CondStmt {
             CondState::OneByte => {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
-                } else {
+                } else if config::FUNC_BYTE_EXT {
                     self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
-                   //self.to_unsolvable();
+                } else {
+                   self.to_unsolvable();
                 }
             },
             CondState::OffsetOpt => {
@@ -152,7 +153,11 @@ impl NextState for CondStmt {
                 self.to_det();
             },
             CondState::Deterministic => {
-                self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
+                if config::FUNC_BYTE_EXT {
+                  self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
+                } else {
+                  self.to_offsets_all_end();
+                }
             },
             CondState::OffsetFunc => {
                   self.to_offsets_rel_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
