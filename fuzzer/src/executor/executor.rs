@@ -274,9 +274,9 @@ impl Executor {
                 }
                 let crash_or_tmout = self.try_unlimited_memory(buf, cmpid, belong);
                 if !crash_or_tmout {
-                    let cond_stmts = self.track(id, buf, speed);
+                    let cond_stmts = self.track(id, buf, speed, belong);
                     if cond_stmts.len() > 0 {
-                        self.depot.add_entries(cond_stmts.clone());
+                        self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &self.func_cmp_map);
                         if !self.rel_rec_set.contains(&id) && (self.func_rel_map.len() != 0) {
                           self.get_func_and_record(cond_stmts);
                           self.rel_rec_set.insert(id);
@@ -285,7 +285,7 @@ impl Executor {
                             self.depot
                                 .add_entries(vec![cond_stmt::CondStmt::get_afl_cond(
                                     id, speed, edge_num,
-                                )]);
+                                )], &self.func_rel_map, &self.func_cmp_map);
                         }
                     }
                 }
@@ -370,7 +370,7 @@ impl Executor {
         used_us / 3
     }
 
-    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32) -> Vec<cond_stmt::CondStmt> {
+    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32, belong: u32) -> Vec<cond_stmt::CondStmt> {
         self.envs.insert(
             defs::TRACK_OUTPUT_VAR.to_string(),
             self.cmd.track_path.clone(),
@@ -404,7 +404,10 @@ impl Executor {
             self.cmd.mode.is_pin_mode(),
             self.cmd.enable_exploitation,
         );
-
+        if let Err(_) = fs::copy(&self.cmd.track_path,
+                 &self.cmd.taint_dir.join(format!("taints_{}", belong))) {
+          println!("can't copy taint file");
+        }
         self.local_stats.track_time += t_now.into();
         cond_list
     }

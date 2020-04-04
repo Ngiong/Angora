@@ -21,6 +21,7 @@ pub struct CondStmt {
     pub num_minimal_optima: usize,
     pub linear: bool,
     pub belong_len : usize,
+    pub func_rel_score : usize,
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
 }
@@ -59,6 +60,7 @@ impl CondStmt {
             num_minimal_optima: 0,
             linear: false,
             belong_len : 0,
+            func_rel_score : 0,
             ext_offset_size : 0,
             ext_offset_size_rel : 0,
         }
@@ -104,7 +106,7 @@ impl CondStmt {
 
     pub fn mark_as_done(&mut self) {
         self.base.condition = defs::COND_DONE_ST;
-        //self.clear();
+        self.clear();
     }
 
     pub fn clear(&mut self) {

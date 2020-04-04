@@ -1,8 +1,10 @@
 use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats};
+use runtime::logger::get_log_data;
 use std::fmt;
 use std::sync::Arc;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use std::path::{Path, PathBuf};
 use crate::depot::Depot;
 use angora_common::{config, defs, tag::TagSeg};
 use rand::{thread_rng, Rng};
@@ -102,16 +104,17 @@ impl fmt::Display for CondState {
 }
 
 pub trait NextState {
-    fn next_state(&mut self, depot : &Arc<Depot>, local_stat : &mut stats::LocalStats, 
+    fn next_state(&mut self, depot : &Arc<Depot>, local_stat : &mut stats::LocalStats, taint_dir : &PathBuf,
                     func_cmp_map : &HashMap<u32, Vec<u32>>,
                     func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_offsets_opt(&mut self);
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
     fn to_det(&mut self);
-    fn to_offsets_func(&mut self,depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, func_cmp_map : &HashMap<u32, Vec<u32>>);
+    fn to_offsets_func(&mut self,depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, taint_dir : &PathBuf, func_cmp_map : &HashMap<u32, Vec<u32>>);
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
                                       local_stats : &mut stats::LocalStats,
+                                      taint_dir : &PathBuf,
                                       func_cmp_map : &HashMap<u32, Vec<u32>>,
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_unsolvable(&mut self);
@@ -122,6 +125,7 @@ pub trait NextState {
 impl NextState for CondStmt {
     fn next_state(&mut self, depot : &Arc<Depot>,
                              local_stats : &mut stats::LocalStats,
+                             taint_dir : &PathBuf,
                              func_cmp_map : &HashMap<u32, Vec<u32>>,
                              func_rel_map : &HashMap<u32, HashMap<u32, u32>>) {
         self.cur_state_fuzz_times = 0;
@@ -137,7 +141,7 @@ impl NextState for CondStmt {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
                 } else {
-                    self.to_offsets_func(depot, local_stats, func_cmp_map);
+                    self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
                    //self.to_unsolvable();
                 }
             },
@@ -148,10 +152,10 @@ impl NextState for CondStmt {
                 self.to_det();
             },
             CondState::Deterministic => {
-                self.to_offsets_func(depot, local_stats, func_cmp_map);
+                self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
             },
             CondState::OffsetFunc => {
-                  self.to_offsets_rel_func(depot, local_stats, func_cmp_map, func_rel_map);
+                  self.to_offsets_rel_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
             },
             _ => {},
         }
@@ -189,40 +193,42 @@ impl NextState for CondStmt {
       selected
     }
     
-    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats,func_cmp_map : &HashMap<u32, Vec<u32>>) {
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, taint_dir : &PathBuf, func_cmp_map : &HashMap<u32, Vec<u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         let start_time = Instant::now();
         self.state = CondState::OffsetFunc;
-        let mut orig_offset = self.offsets.clone();
         if func_cmp_map.len() == 0 { return; }
         let mut cmp_list : Vec<u32> = Vec::new();
-        //get function which contain target cmp
+        //get the list of cmps in the same function
         for (_k, v) in func_cmp_map {
           if v.contains(&self.base.cmpid) { cmp_list = v.clone(); break; }
         }
-        {
-          let q = match depot.queue.lock() {
-              Ok(guard) => guard,
-              Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}};
-          let iter = q.iter();
-          for (i, _p) in iter {
-            if self.base.belong != i.base.belong {continue;}
-            if cmp_list.contains(&i.base.cmpid) {
-              if config::FUNC_REL_RANDOM {
-                orig_offset = merge_offsets(&orig_offset, &i.offsets);
-                orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
-              } else {
-                self.offsets = merge_offsets(&self.offsets, &i.offsets);
-                self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
-              }
-            }
+        let taint_file_path = taint_dir.clone().join(format!("taints_{}", self.base.belong));
+        let taint_file = Path::new(&taint_file_path);
+        let log_data = get_log_data(taint_file).ok().unwrap();
+        let mut new_offsets = vec![];
+        let mut lb_set = HashSet::new();
+        for cond_base in log_data.cond_list.iter() {
+          if cmp_list.contains(&cond_base.cmpid) {
+            lb_set.insert(cond_base.lb1);
+            lb_set.insert(cond_base.lb2);
           }
-        }
+        };
+        for lb in lb_set {
+          match &log_data.tags.get(&lb) {
+            Some(o) => {
+              new_offsets = merge_offsets(&new_offsets,&o);
+            },
+            None => {},
+          };
+        };
         if config::FUNC_REL_RANDOM {
-          let extend_len = offset_len(&orig_offset) - before_size;
+          let extend_len = offset_len(&new_offsets) - before_size;
           let input_len = depot.get_input_buf(self.base.belong as usize).len() as u32;
           let new_random_offset = Self::get_random_offsets(input_len, extend_len);
           self.offsets = merge_offsets(&self.offsets, &new_random_offset);
+        } else {
+          self.offsets = new_offsets;
         }
         self.ext_offset_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
         local_stats.func_time += start_time.elapsed().into();
@@ -230,12 +236,12 @@ impl NextState for CondStmt {
  
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
                                       local_stats : &mut stats::LocalStats,
+                                      taint_dir : &PathBuf,
                                       func_cmp_map : &HashMap<u32, Vec<u32>>,
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>){
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         let start_time = Instant::now();
         if func_cmp_map.len() == 0 {return ;}
-        let mut orig_offset = self.offsets.clone();
         let mut cmp_list : Vec<u32> = Vec::new();
         let mut cmp_func : u32 = 0;
         //get func which contains the cmp.
@@ -257,28 +263,32 @@ impl NextState for CondStmt {
           let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
           cmp_list.append(&mut rel_cmp_list);
         }
-        {
-          let q = match depot.queue.lock() {
-              Ok(guard) => guard,
-              Err(poisoned) => {warn!("Mutex poisoned!"); poisoned.into_inner()}
-          };
-          for (i, _p) in q.iter() {
-            if cmp_list.contains(&i.base.cmpid) {
-              if config::FUNC_REL_RANDOM {
-                orig_offset = merge_offsets(&orig_offset, &i.offsets);
-                orig_offset = merge_offsets(&orig_offset, &i.offsets_opt);
-              } else {
-                self.offsets = merge_offsets(&self.offsets, &i.offsets);
-                self.offsets = merge_offsets(&self.offsets, &i.offsets_opt);
-              }
-            }
+        let taint_file_path = taint_dir.clone().join(format!("taints_{}", self.base.belong));
+        let taint_file = Path::new(&taint_file_path);
+        let log_data = get_log_data(taint_file).ok().unwrap();
+        let mut new_offsets = vec![];
+        let mut lb_set = HashSet::new();
+        for cond_base in log_data.cond_list.iter() {
+          if cmp_list.contains(&cond_base.cmpid) {
+            lb_set.insert(cond_base.lb1);
+            lb_set.insert(cond_base.lb2);
           }
-        }
+        };
+        for lb in lb_set {
+          match &log_data.tags.get(&lb) {
+            Some(o) => {
+              new_offsets = merge_offsets(&new_offsets,&o);
+            },
+            None => {},
+          };
+        };
         if config::FUNC_REL_RANDOM {
-          let extend_len = offset_len(&orig_offset) - before_size;
+          let extend_len = offset_len(&new_offsets) - before_size;
           let input_len = depot.get_input_buf(self.base.belong as usize).len() as u32;
           let new_random_offset = Self::get_random_offsets(input_len, extend_len);
           self.offsets = merge_offsets(&self.offsets, &new_random_offset);
+        } else {
+          self.offsets = new_offsets;
         }
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         self.ext_offset_size_rel = after_size - before_size;

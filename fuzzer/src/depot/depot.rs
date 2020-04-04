@@ -10,7 +10,9 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Mutex,
     },
+    collections::HashMap,
 };
+use angora_common::config;
 // https://crates.io/crates/priority-queue
 use priority_queue::PriorityQueue;
 
@@ -113,7 +115,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(&self, conds: Vec<CondStmt>) {
+    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &HashMap<u32, HashMap<u32, u32>>, func_cmp_map : &HashMap<u32, Vec<u32>>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -121,7 +123,7 @@ impl Depot {
                 poisoned.into_inner()
             },
         };
-
+        let conds_size = conds.len();
         for mut cond in conds {
             if cond.is_desirable {
                 if let Some(v) = q.get_mut(&cond) {
@@ -135,15 +137,38 @@ impl Depot {
                             q.change_priority(&cond, QPriority::done());
                         } else {
                             // Existed, but the new one are better
-                            // If the cond is faster than the older one, we prefer the faster,
-                            if v.0.speed > cond.speed {
+                            // If the cond is faster than the older one,
+                            // we prefer the faster one.
+                            let swap = if config::MUTATE_TC_SELECT {
+                              let mut cmp_list = vec![];
+                              let mut cmp_func : u32 = 0;
+                              for (k, v) in func_cmp_map{
+                                if v.contains(&cond.base.cmpid) {cmp_func = *k; break;}
+                              };
+                              let rels : &HashMap<u32, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
+                              let mut rel_list : Vec<(u32, u32)> = Vec::new();
+                              let mut target_runs = 0;
+                              for (k, v) in rels{
+                                rel_list.push((*k, *v));
+                                if *k == cmp_func { target_runs = *v;}
+                              }
+                              rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+                              for (rel_func, _rel) in rel_list {
+                                let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
+                                cmp_list.append(&mut rel_cmp_list);
+                              };
+                              let func_rel_score = cmp_list.len() / conds_size;
+                              cond.func_rel_score = func_rel_score;
+                              func_rel_score > v.0.func_rel_score
+                            } else { v.0.speed > cond.speed };
+                            if swap {
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
                             }
                         }
                     }
-                } else {
+                } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
                     q.push(cond, priority);
                 }

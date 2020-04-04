@@ -21,6 +21,8 @@ pub static CRASHES_DIR: &str = "crashes";
 pub static HANGS_DIR: &str = "hangs";
 pub static INPUTS_DIR: &str = "queue";
 
+pub static TAINTS_DIR: &str = "taints";
+
 // forksrv.rs
 pub static ENABLE_FORKSRV: &str = "ANGORA_ENABLE_FORKSRV";
 pub static FORKSRV_SOCKET_PATH_VAR: &str = "ANGORA_FORKSRV_SOCKET_PATH";

@@ -194,6 +194,10 @@ fn initialize_directories(in_dir: &str, out_dir: &str, sync_afl: bool) -> (PathB
     } else {
         PathBuf::from(in_dir)
     };
+    
+    let taints_dir = out_dir.join(defs::TAINTS_DIR);
+    fs::create_dir(&taints_dir).unwrap();
+
 
     (seeds_dir, angora_out_dir)
 }

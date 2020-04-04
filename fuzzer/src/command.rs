@@ -39,6 +39,7 @@ pub struct CommandOpt {
     pub main: (String, Vec<String>),
     pub track: (String, Vec<String>),
     pub tmp_dir: PathBuf,
+    pub taint_dir : PathBuf,
     pub out_file: String,
     pub forksrv_socket_path: String,
     pub track_path: String,
@@ -68,6 +69,7 @@ impl CommandOpt {
         let mode = InstrumentationMode::from(mode);
         
         let tmp_dir = out_dir.join(TMP_DIR);
+        let taint_dir = out_dir.join(defs::TAINTS_DIR);
         tmpfs::create_tmpfs_dir(&tmp_dir);
 
         let out_file = tmp_dir.join(INPUT_FILE).to_str().unwrap().to_owned();
@@ -135,6 +137,7 @@ impl CommandOpt {
             main: (main_bin, main_args),
             track: (track_bin, track_args),
             tmp_dir,
+            taint_dir,
             out_file: out_file,
             forksrv_socket_path,
             track_path,
