@@ -371,9 +371,13 @@ impl Executor {
     }
 
     fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32, belong: u32) -> Vec<cond_stmt::CondStmt> {
+        let taint_path = self.cmd.taint_dir.clone().join(format!("taints_{}", belong));
+        let track_path = self.cmd.tmp_dir.join(format!("track_{}",self.cid));
+       // info!("try tracking {}", belong);
         self.envs.insert(
             defs::TRACK_OUTPUT_VAR.to_string(),
-            self.cmd.track_path.clone(),
+            //self.cmd.track_path.clone(),
+            track_path.to_str().unwrap().to_string(),
         );
 
         let t_now: stats::TimeIns = Default::default();
@@ -398,14 +402,15 @@ impl Executor {
         }
 
         let cond_list = track::load_track_data(
-            Path::new(&self.cmd.track_path),
+            //Path::new(&self.cmd.track_path),
+            Path::new(&track_path),
             id as u32,
             speed,
             self.cmd.mode.is_pin_mode(),
             self.cmd.enable_exploitation,
         );
-        if let Err(_) = fs::copy(&self.cmd.track_path,
-                 &self.cmd.taint_dir.join(format!("taints_{}", belong))) {
+        if let Err(_) = fs::copy(&track_path,
+                 &taint_path) {
           println!("can't copy taint file");
         }
         self.local_stats.track_time += t_now.into();

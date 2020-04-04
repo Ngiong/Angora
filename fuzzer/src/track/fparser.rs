@@ -85,7 +85,7 @@ pub fn load_track_data(
     let mut cond_list = match read_and_parse(out_f, is_pin_mode, enable_exploitation) {
         Result::Ok(val) => val,
         Result::Err(err) => {
-            error!("parse track file error!! {:?}", err);
+            error!("parse track file error!! file : {}, {:?}",out_f.to_str().unwrap(), err);
             vec![]
         }
     };
