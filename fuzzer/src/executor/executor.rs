@@ -257,6 +257,8 @@ impl Executor {
             self.has_new_path = true;
             self.local_stats.find_new(&status);
             let id = self.depot.save(status, &buf, cmpid, belong);
+            //belong : id's seed tc
+            //id : current tc
 
             if status == StatusType::Normal {
                 self.local_stats.avg_edge_num.update(edge_num as f32);
@@ -274,7 +276,7 @@ impl Executor {
                 }
                 let crash_or_tmout = self.try_unlimited_memory(buf, cmpid, belong);
                 if !crash_or_tmout {
-                    let cond_stmts = self.track(id, buf, speed, belong);
+                    let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
                         self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &self.func_cmp_map);
                         if !self.rel_rec_set.contains(&id) && (self.func_rel_map.len() != 0) {
@@ -370,8 +372,8 @@ impl Executor {
         used_us / 3
     }
 
-    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32, belong: u32) -> Vec<cond_stmt::CondStmt> {
-        let taint_path = self.cmd.taint_dir.clone().join(format!("taints_{}", belong));
+    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32) -> Vec<cond_stmt::CondStmt> {
+        let taint_path = self.cmd.taint_dir.clone().join(format!("taints_{}", id));
         let track_path = self.cmd.tmp_dir.join(format!("track_{}",self.cid));
        // info!("try tracking {}", belong);
         self.envs.insert(

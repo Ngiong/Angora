@@ -1,6 +1,6 @@
 use super::*;
 use angora_common::defs;
-use std::{fs,fs::OpenOptions, io::prelude::*};
+use std::{fs,io::prelude::*};
 
 impl Drop for Depot {
     fn drop(&mut self) {
@@ -10,17 +10,10 @@ impl Drop for Depot {
         let mut log_q = fs::File::create(dir.join(defs::COND_QUEUE_FILE)).unwrap();
         writeln!(
             log_q,
-            "cmpid, context, order, belong, priority, op, condition, is_desirable, offsets, state"
+            "cmpid, context, order, belong, priority, op, condition, is_desirable, offsets, state, total offset len, fuzz_times, fuzz_type, input_len, extended_size, extended_size_rel, func_rel_score, belongs"
         )
         .unwrap();
         
-        let cpath = self.dirs.crashes_dir.as_path().parent().unwrap().join("conds.csv");
-        let mut cond_file = OpenOptions::new().write(true).create(true)
-                               .open(cpath).expect("Can't open conds.csv");
-        if let Err(_) = writeln!(cond_file,
-              "cmpid,context,belong,condition,state,# of offsets,total offset len,fuzz_times,priority,fuzz_type,input_len, extended_size, extended_size_rel")
-          {eprintln!("can't write conds.csv")}
-
         let q = self.queue.lock().unwrap();
 
         for (cond, p) in q.iter() {
@@ -32,7 +25,7 @@ impl Drop for Depot {
 
                 writeln!(
                     log_q,
-                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}",
+                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}",
                     cond.base.cmpid,
                     cond.base.context,
                     cond.base.order,
@@ -45,15 +38,16 @@ impl Drop for Depot {
                     cond.is_desirable,
                     offsets.join("&"),
                     cond.state,
+                    cond.get_offset_len(),
+                    cond.get_fuzz_type(),
+                    cond.belong_len,
+                    cond.ext_offset_size,
+                    cond.ext_offset_size_rel,
+                    cond.func_rel_score,
+                    cond.belongs,
                 )
                 .unwrap();
             }
-  
-            let condinfo = format!("{},{},{},{},{},{},{},{},{},{},{},{},{}",cond.base.cmpid,cond.base.context,cond.base.belong,
-                                   cond.base.condition,cond.state,cond.offsets.len(),cond.get_offset_len(),
-                                   cond.fuzz_times,p,cond.get_fuzz_type(), cond.belong_len,
-                                   cond.ext_offset_size,cond.ext_offset_size_rel);
-            if let Err(_) = writeln!(cond_file, "{}", condinfo) {eprintln!("can't write conds.csv");}
         }
     }
 }

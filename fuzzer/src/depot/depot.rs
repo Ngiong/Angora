@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Mutex,
     },
-    collections::HashMap,
+    collections::{HashMap,HashSet},
 };
 use angora_common::config;
 // https://crates.io/crates/priority-queue
@@ -125,6 +125,10 @@ impl Depot {
             },
         };
         let conds_size = conds.len();
+        let mut conds_set = HashSet::new();
+        for cond in &conds {
+          conds_set.insert(cond.base.cmpid);
+        }
         for mut cond in conds {
             if cond.is_desirable {
                 if let Some(v) = q.get_mut(&cond) {
@@ -141,7 +145,6 @@ impl Depot {
                             // If the cond is faster than the older one,
                             // we prefer the faster one.
                             let swap = if config::MUTATE_TC_SELECT {
-                              let mut cmp_list = vec![];
                               let mut cmp_func : u32 = 0;
                               for (k, v2) in func_cmp_map{
                                 if v2.contains(&cond.base.cmpid) {cmp_func = *k; break;}
@@ -154,11 +157,15 @@ impl Depot {
                                 if *k == cmp_func { target_runs = *v2;}
                               }
                               rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+                              let mut cmp_set = HashSet::new();
                               for (rel_func, _rel) in rel_list {
-                                let mut rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
-                                cmp_list.append(&mut rel_cmp_list);
+                                let rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
+                                for rel_cmp in rel_cmp_list {
+                                  cmp_set.insert(rel_cmp);
+                                };
                               };
-                              let func_rel_score = cmp_list.len() / conds_size;
+                              cmp_set.retain(|x| (conds_set.contains(x)));
+                              let func_rel_score = (cmp_set.len() as f32) / (conds_size as f32);
                               cond.func_rel_score = func_rel_score;
                               func_rel_score > v.0.func_rel_score
                             } else if config::MUTATE_RANDOM  {

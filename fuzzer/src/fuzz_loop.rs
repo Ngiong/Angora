@@ -3,11 +3,14 @@ use crate::{
     executor::Executor, fuzz_type::FuzzType, search::*, stats,
 };
 //use angora_common::config;
+use std::fs;
+use std::io::Write;
 use rand::prelude::*;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
+use angora_common::defs;
 use std::collections::HashMap;
 
 pub fn fuzz_loop(
@@ -30,6 +33,9 @@ pub fn fuzz_loop(
       func_rel_map.insert(*k1, tmp_map);
     }
 
+    let mut logf = fs::File::create(cmd_opt.tmp_dir.parent().unwrap().join(format!("runlog{}",cid))).unwrap();
+    writeln!(logf, "cmpid, context, belong, fuzz_times, func_rel_score, offset_len, belong_len, success").unwrap();
+
     let mut executor = Executor::new(
         cmd_opt,
         global_branches,
@@ -40,6 +46,8 @@ pub fn fuzz_loop(
         func_id_map,
         cid,
     );
+    
+
     while running.load(Ordering::Relaxed) {
         let entry = match depot.get_entry() {
             Some(e) => e,
@@ -121,6 +129,7 @@ pub fn fuzz_loop(
             }
         }
 
+        writeln!(logf, "{},{},{},{},{},{},{},{}",cond.base.cmpid, cond.base.context, cond.base.belong, cond.fuzz_times, cond.func_rel_score, cond.get_offset_len(), cond.belong_len, cond.base.condition == defs::COND_DONE_ST).unwrap();
         depot.update_entry(cond);
     }
 }

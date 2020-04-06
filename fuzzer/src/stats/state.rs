@@ -98,7 +98,7 @@ impl fmt::Display for StateStats {
         write!(
             f,
             r#"           |     FIRST: {},   SECOND: {},   MERGED: {}
-           |    NORMAL: ,   NORMAL_END: {},   ONE_BYTE: {}
+           |NORMAL_END: {},   ONE_BYTE: {}
            |       DET: {},    TIMEOUT: {},     UNSOLVABLE: {}
            |     FUNC : {},  FUNC_REL : {}"#,
             self.first_offset, self.second_offset, self.merged_offset, self.normal_end, self.one_byte, self.det, self.timeout, self.unsolvable, self.func, self.func_rel

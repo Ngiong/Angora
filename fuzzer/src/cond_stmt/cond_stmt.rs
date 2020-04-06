@@ -22,7 +22,7 @@ pub struct CondStmt {
     pub linear: bool,
     pub belong_len : usize,
     pub belongs : u32,
-    pub func_rel_score : usize,
+    pub func_rel_score : f32,
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
 }
@@ -62,7 +62,7 @@ impl CondStmt {
             linear: false,
             belong_len : 0,
             belongs : 0,
-            func_rel_score : 0,
+            func_rel_score : 0.0,
             ext_offset_size : 0,
             ext_offset_size_rel : 0,
         }
