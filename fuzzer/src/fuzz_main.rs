@@ -97,6 +97,8 @@ pub fn fuzz_main(
         &func_cmp_map, 
         &func_id_map,
     );
+   
+    let taint_dir = angora_out_dir.join(defs::TAINTS_DIR);
 
     let log_file = match fs::File::create(angora_out_dir.join(defs::ANGORA_LOG_FILE)) {
         Ok(a) => a,
@@ -122,6 +124,10 @@ pub fn fuzz_main(
         if handle.join().is_err() {
             error!("Error happened in fuzzing thread!");
         }
+    }
+    match fs::remove_dir(&taint_dir) {
+       Ok(_) => (),
+       Err(e) => warn!("Could not remove the taints dir : {:?}", e),
     }
 
     match fs::remove_file(&fuzzer_stats) {
