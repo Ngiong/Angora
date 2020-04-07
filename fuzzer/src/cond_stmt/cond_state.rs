@@ -39,6 +39,7 @@ impl CondStmt {
           CondState::OffsetOpt => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[1] },
           CondState::OffsetAll => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[2] },
           CondState::OffsetFunc => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[3] },
+          CondState::OffsetRelFunc => { self.cur_state_fuzz_times >= config::STATE_LONG_FUZZ_TIME[4]},
           _ => {false}  //onebyte,unsolvable,timeout,offsetallend
         }
       }
@@ -119,6 +120,7 @@ pub trait NextState {
                                       func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
+    fn to_next_belong(&mut self, taint_dir : &PathBuf);
     fn get_random_offsets( input_len : u32, extend_len : u32) -> Vec<TagSeg>; 
 }
 
@@ -140,8 +142,10 @@ impl NextState for CondStmt {
             CondState::OneByte => {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
-                } else if config::FUNC_BYTE_EXT {
+                } else if config::BYTE_EXT_FUNC_REL || config::BYTE_EXT_RANDOM {
                     self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
+                } else if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
+                    self.to_next_belong(taint_dir);
                 } else {
                    self.to_unsolvable();
                 }
@@ -153,14 +157,23 @@ impl NextState for CondStmt {
                 self.to_det();
             },
             CondState::Deterministic => {
-                if config::FUNC_BYTE_EXT {
+                if config::BYTE_EXT_FUNC_REL || config::BYTE_EXT_RANDOM {
                   self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
+                } else if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
+                  self.to_next_belong(taint_dir);
                 } else {
                   self.to_offsets_all_end();
                 }
             },
             CondState::OffsetFunc => {
                   self.to_offsets_rel_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
+            },
+            CondState::OffsetRelFunc => {
+               if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
+                  self.to_next_belong(taint_dir);
+               } else {
+                  self.to_offsets_all_end();
+               }
             },
             _ => {},
         }
@@ -233,7 +246,7 @@ impl NextState for CondStmt {
             None => {},
           };
         };
-        if config::FUNC_REL_RANDOM {
+        if config::BYTE_EXT_RANDOM {
           let extend_len = offset_len(&new_offsets) - before_size;
           let input_len = depot.get_input_buf(self.base.belong as usize).len() as u32;
           let new_random_offset = Self::get_random_offsets(input_len, extend_len);
@@ -300,7 +313,7 @@ impl NextState for CondStmt {
             None => {},
           };
         };
-        if config::FUNC_REL_RANDOM {
+        if config::BYTE_EXT_RANDOM {
           let extend_len = offset_len(&new_offsets) - before_size;
           let input_len = depot.get_input_buf(self.base.belong as usize).len() as u32;
           let new_random_offset = Self::get_random_offsets(input_len, extend_len);
@@ -312,6 +325,41 @@ impl NextState for CondStmt {
         self.ext_offset_size_rel = after_size - before_size;
         if self.ext_offset_size_rel == 0 { warn!("0 size rel extension");}
         local_stats.func_time += start_time.elapsed().into();
+    }
+
+    fn to_next_belong(&mut self, taint_dir : &PathBuf) {
+      if config::TC_SEL_FUNC_REL && (self.belong_changed + 1 >= self.func_rel_score.len()) { return; };
+      let next_belong = if config::TC_SEL_FUNC_REL {self.func_rel_score[self.belong_changed + 1].1}
+                        else if config::TC_SEL_RANDOM {
+                          let mut rng = thread_rng();
+                          rng.gen_range(0,self.belongs.len() as u32)
+                        } else {
+                          panic!("to_next_belong called with unproper configuration!");
+                        };
+      let taint_file_path = taint_dir.clone().join(format!("taints_{}", next_belong));
+      let taint_file = Path::new(&taint_file_path);
+      let log_data = match get_log_data(taint_file) {
+        Ok(s) => {s},
+        Err(_) => { error!("Can't get log data : cmpid : {}, belong: {}", self.base.cmpid, next_belong);
+          return;
+        },
+      };
+      let mut new_offsets = vec![];
+      match &log_data.tags.get(&self.base.lb1) {
+        Some(o) => {new_offsets = merge_offsets(&new_offsets, &o);},
+        None => {},
+      };
+      match &log_data.tags.get(&self.base.lb2) {
+        Some(o) => {new_offsets = merge_offsets(&new_offsets, &o);},
+        None => {},
+      };
+      self.belong_changed += 1;
+      if new_offsets.len() == 0 {
+        self.to_next_belong(taint_dir);
+      } else {
+        self.offsets = new_offsets;
+        self.state = CondState::Offset;
+      };
     }
 
     fn to_unsolvable(&mut self) {

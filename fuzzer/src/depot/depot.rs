@@ -1,7 +1,6 @@
 use super::*;
 use crate::{cond_stmt::CondStmt, executor::StatusType};
 use rand;
-use rand::{thread_rng,Rng};
 use std::{
     fs,
     io::prelude::*,
@@ -23,6 +22,30 @@ pub struct Depot {
     pub num_hangs: AtomicUsize,
     pub num_crashes: AtomicUsize,
     pub dirs: DepotDir,
+}
+
+fn get_func_rel_score(cmpid : u32, conds_set : &HashSet<u32>, func_rel_map : &HashMap<u32, HashMap<u32, u32>>, func_cmp_map : &HashMap<u32, Vec<u32>>) -> f32 {
+  let mut cmp_func : u32 = 0;
+  for (k, v2) in func_cmp_map{
+    if v2.contains(&cmpid) {cmp_func = *k; break;}
+  };
+  let rels : &HashMap<u32, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return 0.0 };
+  let mut rel_list : Vec<(u32, u32)> = Vec::new();
+  let mut target_runs = 0;
+  for (k, v2) in rels{
+    rel_list.push((*k, *v2));
+    if *k == cmp_func { target_runs = *v2;}
+  }
+  rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
+  let mut cmp_set = HashSet::new();
+  for (rel_func, _rel) in rel_list {
+    let rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
+    for rel_cmp in rel_cmp_list {
+      cmp_set.insert(rel_cmp);
+    };
+  };
+  cmp_set.retain(|x| (conds_set.contains(x)));
+  (cmp_set.len() as f32) / (conds_set.len() as f32)
 }
 
 impl Depot {
@@ -124,7 +147,6 @@ impl Depot {
                 poisoned.into_inner()
             },
         };
-        let conds_size = conds.len();
         let mut conds_set = HashSet::new();
         for cond in &conds {
           conds_set.insert(cond.base.cmpid);
@@ -144,48 +166,51 @@ impl Depot {
                             // Existed, but the new one are better
                             // If the cond is faster than the older one,
                             // we prefer the faster one.
-                            let swap = if config::MUTATE_TC_SELECT {
-                              let mut cmp_func : u32 = 0;
-                              for (k, v2) in func_cmp_map{
-                                if v2.contains(&cond.base.cmpid) {cmp_func = *k; break;}
-                              };
-                              let rels : &HashMap<u32, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return () };
-                              let mut rel_list : Vec<(u32, u32)> = Vec::new();
-                              let mut target_runs = 0;
-                              for (k, v2) in rels{
-                                rel_list.push((*k, *v2));
-                                if *k == cmp_func { target_runs = *v2;}
-                              }
-                              rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
-                              let mut cmp_set = HashSet::new();
-                              for (rel_func, _rel) in rel_list {
-                                let rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
-                                for rel_cmp in rel_cmp_list {
-                                  cmp_set.insert(rel_cmp);
+                            let swap = if config::TC_SEL_FUNC_REL {
+                              //prefer tc with highler 
+                              let func_rel_score = get_func_rel_score(cond.base.cmpid, &conds_set, func_rel_map, func_cmp_map);
+                              (func_rel_score > v.0.func_rel_score[0].0, func_rel_score)
+                            } else {(v.0.speed > cond.speed, 0.0)};
+                            let mut new_fr_score = v.0.func_rel_score.clone();
+                            if config::TC_SEL_FUNC_REL {
+                              let mut inserted = false;
+                              for (i, fr) in v.0.func_rel_score.iter().enumerate() {
+                                if fr.0 < swap.1 {
+                                  new_fr_score.insert(i, (swap.1, cond.base.belong));
+                                  inserted = true;
+                                  break;
                                 };
                               };
-                              cmp_set.retain(|x| (conds_set.contains(x)));
-                              let func_rel_score = (cmp_set.len() as f32) / (conds_size as f32);
-                              cond.func_rel_score = func_rel_score;
-                              func_rel_score > v.0.func_rel_score
-                            } else if config::MUTATE_RANDOM  {
-                              let mut rng = thread_rng();
-                              let x : f32 = rng.gen();
-                              (1.0 / (v.0.belongs as f32)) > x
-                            } else { v.0.speed > cond.speed };
-                            if swap {
-                                cond.belongs = 1;
+                              if !inserted && new_fr_score.len() < config::STMT_BELONGS_LIMIT {
+                                new_fr_score.push((swap.1, cond.base.belong));
+                              } else if new_fr_score.len() > config::STMT_BELONGS_LIMIT { new_fr_score.pop();};
+                            };
+                            if swap.0 {
+                                cond.func_rel_score = new_fr_score;
+                                if config::TC_SEL_RANDOM {
+                                  cond.belongs = v.0.belongs.clone();
+                                  cond.belongs.insert(cond.base.belong);
+                                }
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
                             } else {
-                              v.0.belongs += 1;
+                              v.0.func_rel_score = new_fr_score;
+                              if config::TC_SEL_RANDOM {
+                                v.0.belongs.insert(cond.base.belong);
+                              }
                             }
                         }
                     }
                 } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
-                    cond.belongs = 1;
+                    if config::TC_SEL_FUNC_REL {
+                      cond.func_rel_score.push((get_func_rel_score(cond.base.cmpid, &conds_set, func_rel_map, func_cmp_map)
+                                                ,cond.base.belong));
+                    };
+                    if config::TC_SEL_RANDOM {
+                      cond.belongs.insert(cond.base.belong);
+                    };
                     q.push(cond, priority);
                 }
             }

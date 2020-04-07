@@ -2,6 +2,15 @@ use super::*;
 use angora_common::defs;
 use std::{fs,io::prelude::*};
 
+fn func_rel_score_string(v : &Vec::<(f32,u32)>) -> std::string::String {
+  let mut s = String::from("[");
+  for rel in v {
+    s.push_str(format!("({},{}),", rel.0, rel.1).as_str());
+  };
+  s.push_str("]");
+  s
+}
+
 impl Drop for Depot {
     fn drop(&mut self) {
         info!("dump constraints and chart..");
@@ -10,7 +19,7 @@ impl Drop for Depot {
         let mut log_q = fs::File::create(dir.join(defs::COND_QUEUE_FILE)).unwrap();
         writeln!(
             log_q,
-            "cmpid, context, order, belong, priority, op, condition, is_desirable, offsets, state, total offset len, fuzz_times, fuzz_type, input_len, extended_size, extended_size_rel, func_rel_score, belongs"
+            "cmpid, context, order, belong, priority, op, condition, is_desirable, offsets, state, total offset len, fuzz_times, fuzz_type, input_len, extended_size, extended_size_rel, func_rel_score, belongs, belongs_changed"
         )
         .unwrap();
         
@@ -25,7 +34,7 @@ impl Drop for Depot {
 
                 writeln!(
                     log_q,
-                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}",
+                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}, {}",
                     cond.base.cmpid,
                     cond.base.context,
                     cond.base.order,
@@ -43,8 +52,9 @@ impl Drop for Depot {
                     cond.belong_len,
                     cond.ext_offset_size,
                     cond.ext_offset_size_rel,
-                    cond.func_rel_score,
-                    cond.belongs,
+                    func_rel_score_string(&cond.func_rel_score),
+                    cond.belongs.len(),
+                    cond.belong_changed,
                 )
                 .unwrap();
             }

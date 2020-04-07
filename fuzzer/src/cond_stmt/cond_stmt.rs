@@ -3,6 +3,7 @@ use crate::fuzz_type::FuzzType;
 use angora_common::{cond_stmt_base::CondStmtBase, defs, tag::TagSeg};
 use crate::mut_input::offsets::offset_len;
 use std::hash::{Hash, Hasher};
+use std::collections::HashSet;
 
 #[derive(Debug, Default, Clone)]
 pub struct CondStmt {
@@ -21,10 +22,11 @@ pub struct CondStmt {
     pub num_minimal_optima: usize,
     pub linear: bool,
     pub belong_len : usize,
-    pub belongs : u32,
-    pub func_rel_score : f32,
+    pub belongs : HashSet<u32>, 
+    pub func_rel_score : Vec<(f32,u32)>,
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
+    pub belong_changed : usize,
 }
 
 impl PartialEq for CondStmt {
@@ -61,10 +63,11 @@ impl CondStmt {
             num_minimal_optima: 0,
             linear: false,
             belong_len : 0,
-            belongs : 0,
-            func_rel_score : 0.0,
+            belongs: HashSet::new(),
+            func_rel_score : vec![],
             ext_offset_size : 0,
             ext_offset_size_rel : 0,
+            belong_changed : 0,
         }
     }
 

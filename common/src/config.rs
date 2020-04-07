@@ -49,16 +49,17 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 pub const FUNC_REL_HIGH_THRESHOLD : f64 = 0.7;
 pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
 
-//MUTATE TC SELECTION
-pub const MUTATE_TC_SELECT : bool = false;
-pub const MUTATE_RANDOM : bool = false;
+//MUTATE TC SELECTION assume either one of them or none of them
+pub const TC_SEL_FUNC_REL : bool = false;
+pub const TC_SEL_RANDOM : bool = false;
 
 pub const FUNC_REL_TC_SELECT : bool = true;
 
-//BYTE EXTENSION
-pub const FUNC_BYTE_EXT : bool = true;
-pub const FUNC_REL_RANDOM : bool = false;
+//BYTE EXTENSION assume either one of them or none of them
+pub const BYTE_EXT_FUNC_REL : bool = false;
+pub const BYTE_EXT_RANDOM : bool = false;
 
 pub const FUNC_CMP_SIZE : usize = 1;
+pub const STMT_BELONGS_LIMIT : usize = 8;
 
-pub const STATE_LONG_FUZZ_TIME : [u32; 4] = [8,1,1,8];  //first,second,merged,func,func_rel,runc_rel2
+pub const STATE_LONG_FUZZ_TIME : [u32; 5] = [8,1,1,8,8];  //first,second,merged,func,func_rel

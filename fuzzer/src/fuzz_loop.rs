@@ -129,7 +129,7 @@ pub fn fuzz_loop(
             }
         }
 
-        writeln!(logf, "{},{},{},{},{},{},{},{}",cond.base.cmpid, cond.base.context, cond.base.belong, cond.fuzz_times, cond.func_rel_score, cond.get_offset_len(), cond.belong_len, cond.base.condition == defs::COND_DONE_ST).unwrap();
+        writeln!(logf, "{},{},{},{},{},{},{},{}",cond.base.cmpid, cond.base.context, cond.base.belong, cond.fuzz_times, cond.func_rel_score[0].0, cond.get_offset_len(), cond.belong_len, cond.base.condition == defs::COND_DONE_ST).unwrap();
         depot.update_entry(cond);
     }
 }
