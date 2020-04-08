@@ -125,7 +125,7 @@ pub fn fuzz_main(
             error!("Error happened in fuzzing thread!");
         }
     }
-    match fs::remove_dir(&taint_dir) {
+    match fs::remove_dir_all(&taint_dir) {
        Ok(_) => (),
        Err(e) => warn!("Could not remove the taints dir : {:?}", e),
     }
