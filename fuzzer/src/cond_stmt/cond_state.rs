@@ -112,7 +112,11 @@ pub trait NextState {
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
     fn to_det(&mut self);
-    fn to_offsets_func(&mut self,depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, taint_dir : &PathBuf, func_cmp_map : &HashMap<u32, Vec<u32>>);
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>,
+                                  local_stats : &mut stats::LocalStats,
+                                  taint_dir : &PathBuf,
+                                  func_cmp_map : &HashMap<u32, Vec<u32>>,
+                                  func_rel_map : &HashMap<u32, HashMap<u32, u32>>);
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
                                       local_stats : &mut stats::LocalStats,
                                       taint_dir : &PathBuf,
@@ -143,7 +147,7 @@ impl NextState for CondStmt {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
                 } else if config::BYTE_EXT_FUNC_REL || config::BYTE_EXT_RANDOM {
-                    self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
+                    self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
                 } else if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                     self.to_next_belong(taint_dir);
                 } else {
@@ -158,7 +162,7 @@ impl NextState for CondStmt {
             },
             CondState::Deterministic => {
                 if config::BYTE_EXT_FUNC_REL || config::BYTE_EXT_RANDOM {
-                  self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map);
+                  self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
                 } else if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                   self.to_next_belong(taint_dir);
                 } else {
@@ -211,7 +215,7 @@ impl NextState for CondStmt {
       selected
     }
     
-    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, taint_dir : &PathBuf, func_cmp_map : &HashMap<u32, Vec<u32>>) {
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, taint_dir : &PathBuf, func_cmp_map : &HashMap<u32, Vec<u32>>, func_rel_map : &HashMap<u32, HashMap<u32, u32>>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         let start_time = Instant::now();
         self.state = CondState::OffsetFunc;
@@ -254,8 +258,10 @@ impl NextState for CondStmt {
         } else {
           self.offsets = new_offsets;
         }
-        self.ext_offset_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
+        let ext_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
+        self.ext_offset_size += ext_size;
         local_stats.func_time += start_time.elapsed().into();
+        if ext_size == 0 {self.next_state(depot,local_stats, taint_dir, func_cmp_map, func_rel_map);}; 
     }
  
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
@@ -322,9 +328,9 @@ impl NextState for CondStmt {
           self.offsets = new_offsets;
         }
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
-        self.ext_offset_size_rel = after_size - before_size;
-        if self.ext_offset_size_rel == 0 { warn!("0 size rel extension");}
+        self.ext_offset_size_rel += after_size - before_size;
         local_stats.func_time += start_time.elapsed().into();
+        if (after_size - before_size) == 0 {self.next_state(depot,local_stats,taint_dir,func_cmp_map,func_rel_map);}
     }
 
     fn to_next_belong(&mut self, taint_dir : &PathBuf) {
