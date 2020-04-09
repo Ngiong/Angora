@@ -166,27 +166,24 @@ impl Depot {
                             // Existed, but the new one are better
                             // If the cond is faster than the older one,
                             // we prefer the faster one.
-                            let swap = if config::TC_SEL_FUNC_REL {
-                              //prefer tc with highler 
-                              let func_rel_score = get_func_rel_score(cond.base.cmpid, &conds_set, func_rel_map, func_cmp_map);
-                              (func_rel_score > v.0.func_rel_score[0].0, func_rel_score)
-                            } else {(v.0.speed > cond.speed, 0.0)};
                             let mut new_fr_score = v.0.func_rel_score.clone();
                             if config::TC_SEL_FUNC_REL {
+                              let func_rel_score = get_func_rel_score(cond.base.cmpid, &conds_set, func_rel_map, func_cmp_map);
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
-                                if fr.0 < swap.1 {
-                                  new_fr_score.insert(i, (swap.1, cond.base.belong));
+                                if fr.0 < func_rel_score {
+                                  new_fr_score.insert(i, (func_rel_score, cond.base.belong));
                                   inserted = true;
                                   break;
                                 };
                               };
                               if !inserted && new_fr_score.len() < config::STMT_BELONGS_LIMIT {
-                                new_fr_score.push((swap.1, cond.base.belong));
+                                new_fr_score.push((func_rel_score, cond.base.belong));
                               } else if new_fr_score.len() > config::STMT_BELONGS_LIMIT { new_fr_score.pop();};
                             };
-                            if swap.0 {
+                            if v.0.speed > cond.speed {
                                 cond.func_rel_score = new_fr_score;
+                                cond.executed_belongs = v.0.executed_belongs.clone();
                                 if config::TC_SEL_RANDOM {
                                   cond.belongs = v.0.belongs.clone();
                                   cond.belongs.insert(cond.base.belong);

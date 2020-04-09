@@ -334,14 +334,27 @@ impl NextState for CondStmt {
     }
 
     fn to_next_belong(&mut self, taint_dir : &PathBuf) {
-      if config::TC_SEL_FUNC_REL && (self.belong_changed + 1 >= self.func_rel_score.len()) { return; };
-      let next_belong = if config::TC_SEL_FUNC_REL {self.func_rel_score[self.belong_changed + 1].1}
+      self.executed_belongs.insert(self.base.belong);
+      let next_belong = if config::TC_SEL_FUNC_REL {
+                          let mut nb = None;
+                          for frs in &self.func_rel_score {
+                            if !self.executed_belongs.contains(&frs.1) {
+                              nb = Some(frs.1);
+                              break;
+                            }
+                          };
+                          match nb {
+                            Some(b) => {b},
+                            None => {return;}
+                          }
+                        }
                         else if config::TC_SEL_RANDOM {
                           let mut rng = thread_rng();
                           rng.gen_range(0,self.belongs.len() as u32)
                         } else {
                           panic!("to_next_belong called with unproper configuration!");
                         };
+
       let taint_file_path = taint_dir.clone().join(format!("taints_{}", next_belong));
       let taint_file = Path::new(&taint_file_path);
       let log_data = match get_log_data(taint_file) {
