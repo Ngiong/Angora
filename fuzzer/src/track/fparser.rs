@@ -52,6 +52,7 @@ fn get_offsets_and_variables(
     let offsets2 = m.get(&cond.base.lb2).unwrap_or(&empty_offsets);
     if offsets2.len() == 0 || (offsets1.len() > 0 && offsets1.len() <= offsets2.len()) {
         //pick shorter one?
+        //offset 1
         cond.offsets = offsets1.clone();
         if cond.base.lb2 > 0 && cond.base.lb1 != cond.base.lb2 {
             cond.offsets_opt = offsets2.clone();  //save it for later..
@@ -63,6 +64,7 @@ fn get_offsets_and_variables(
             mut_input::write_as_ule(cond.base.arg2, cond.base.size as usize)
         };
     } else {
+        //offset 2
         cond.offsets = offsets2.clone();
         if cond.base.lb1 > 0 && cond.base.lb1 != cond.base.lb2 {
             cond.offsets_opt = offsets1.clone();

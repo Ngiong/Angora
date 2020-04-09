@@ -364,6 +364,18 @@ impl NextState for CondStmt {
         self.to_next_belong(taint_dir);
       } else {
         self.offsets = new_offsets;
+        let mut cond_index = None;
+        for (i, cb) in log_data.cond_list.iter().enumerate() {
+          if cb.cmpid == self.base.cmpid {
+            cond_index = Some(i);
+            break;
+          }
+        };
+        self.variables =  if let Some(idx) = cond_index {
+          if let Some(args) = &log_data.magic_bytes.get(&idx){
+            [&args.1[..], &args.0[..]].concat()
+          } else {vec![]}
+        } else { vec![] };
         self.state = CondState::Offset;
       };
     }
