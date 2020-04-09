@@ -5,17 +5,8 @@ use clap::{App, Arg};
 extern crate angora;
 extern crate angora_common;
 use angora::fuzz_main;
-use std::thread;
-
-const STACK_SIZE : usize = 2000 * 1024;
 
 fn main() {
-  let builder = thread::Builder::new().stack_size(STACK_SIZE);
-  let handler = builder.spawn(|| { main_thread() }).unwrap();
-  handler.join().unwrap();
-}
-
-fn main_thread() {
     let matches = App::new("angora-fuzzer")
         .version(crate_version!())
         .about("Angora is a mutation-based fuzzer. The main goal of Angora is to increase branch coverage by solving path constraints without symbolic execution.")

@@ -374,6 +374,7 @@ impl NextState for CondStmt {
       };
       self.belong_changed += 1;
       if new_offsets.len() == 0 {
+        self.executed_belongs.insert(next_belong);
         self.to_next_belong(taint_dir);
       } else {
         self.offsets = new_offsets;
