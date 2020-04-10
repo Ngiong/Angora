@@ -44,8 +44,8 @@ fn get_func_rel_score(cmpid : u32, conds_set : &HashSet<u32>, func_rel_map : &Ha
       cmp_set.insert(rel_cmp);
     };
   };
-  cmp_set.retain(|x| (conds_set.contains(x)));
-  (cmp_set.len() as f32) / (conds_set.len() as f32)
+  let inter_len = cmp_set.intersection(conds_set).len();
+  (inter_len as f32) / (conds_set.len() as f32) 
 }
 
 impl Depot {
