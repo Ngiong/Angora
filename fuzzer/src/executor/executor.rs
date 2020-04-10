@@ -36,12 +36,12 @@ pub struct Executor {
     pub has_new_path: bool,
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
-    pub func_rel_map : HashMap<u32, HashMap<u32, u32>>,
-    pub func_cmp_map : HashMap<u32, Vec<u32>>,
-    pub func_id_map : HashMap<u32, String>,
+    pub func_rel_map : Vec<Vec<u32>>,
+    pub func_cmp_map : Vec<Vec<u32>>,
+    pub func_id_map : Vec<String>,
     pub rel_rec_set : HashSet<usize>,
     pub func_uniq_call_set : HashSet<Vec<u32>>,
-    pub func_executed : Vec<u32>,
+    pub func_executed : Vec<usize>,
     pub cid : usize,
 }
 
@@ -51,9 +51,9 @@ impl Executor {
         global_branches: Arc<branches::GlobalBranches>,
         depot: Arc<depot::Depot>,
         global_stats: Arc<RwLock<stats::ChartStats>>,
-        func_rel_map : HashMap<u32, HashMap<u32, u32>>,
-        func_cmp_map : HashMap<u32, Vec<u32>>,
-        func_id_map : HashMap<u32, String>,
+        func_rel_map : Vec<Vec<u32>>,
+        func_cmp_map : Vec<Vec<u32>>,
+        func_id_map : Vec<String>,
         cid : usize,
     ) -> Self {
         // ** Share Memory **
@@ -477,19 +477,12 @@ impl Executor {
     }
     
     pub fn get_func_and_record(&mut self, cond_list : Vec<cond_stmt::CondStmt>) {
-      let mut func_set = HashSet::new();
+      //the set of all executed function
+      let mut func_set : HashSet<usize> = HashSet::new();
       for c in cond_list{
-        let mut found = false;
-        for (funcid, cmplist) in &self.func_cmp_map{
-          for cmpi in cmplist {
-            if *cmpi == c.base.cmpid {
-              func_set.insert(*funcid);
-              found = true;
-              break;
-            }
-          }
-          if found {
-            break;
+        for (funcid, cmplist) in self.func_cmp_map.iter().enumerate(){
+          if cmplist.contains(&c.base.cmpid) {
+              func_set.insert(funcid as usize);
           }
         }
       }
@@ -533,7 +526,7 @@ impl Executor {
         if ! self.func_uniq_call_set.contains(&hashvec) {
           for f1 in &func_orig_set{
             for f2 in &func_orig_set{
-              *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
+              self.func_rel_map[*f1][*f2] += 1;
             }
           }
           self.func_uniq_call_set.insert(hashvec);
@@ -541,7 +534,7 @@ impl Executor {
       } else {
         for f1 in &func_set{
           for f2 in &func_set{
-            *(self.func_rel_map.get_mut(f1).expect("getmut from func_rel_map error").get_mut(f2).unwrap()) += 1;
+            self.func_rel_map[*f1][*f2] += 1;
           }
         }
       }
@@ -576,18 +569,14 @@ impl Drop for Executor {
     if let Err(_) = writeln!(rel_all_file, "choose : {}, # of selected TC : {}",
                              config::FUNC_REL_TC_SELECT, self.func_uniq_call_set.len()) {eprintln!("can't write ")};
     if let Err(_) = write!(rel_all_file, ",") {eprintln!("can't write in rel_all.csv");}
-    let mut func_list = Vec::<u32>::new();
-    for (fid, _rel) in self.func_rel_map.iter() {
-      func_list.push(*fid);
-    }
-    for f1 in &func_list {
-      if let Err(_) = write!(rel_all_file, "{},", self.func_id_map.get(f1).unwrap()) {eprintln!("can't write 1")}
+    for func_id in &self.func_id_map {
+      if let Err(_) = write!(rel_all_file, "{},", func_id) {eprintln!("can't write 1")}
     }
     if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
-    for f1 in &func_list {
-      if let Err(_) = write!(rel_all_file, "{},", self.func_id_map.get(f1).unwrap()) {eprintln!("can't write 1")}
-      for f2 in &func_list {
-        if let Err(_) = write!(rel_all_file, "{},", self.func_rel_map.get(f1).unwrap().get(f2).unwrap()) {eprintln!("can't write 1")}
+    for (i, f1) in self.func_rel_map.iter().enumerate() {
+      if let Err(_) = write!(rel_all_file, "{},", self.func_id_map[i]) {eprintln!("can't write 1")}
+      for f2 in f1 {
+        if let Err(_) = write!(rel_all_file, "{},", f2) {eprintln!("can't write 1")}
       }
       if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
     }

@@ -8,7 +8,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
-use std::collections::HashMap;
 
 pub fn fuzz_loop(
     running: Arc<AtomicBool>,
@@ -16,19 +15,19 @@ pub fn fuzz_loop(
     depot: Arc<Depot>,
     global_branches: Arc<GlobalBranches>,
     global_stats: Arc<RwLock<stats::ChartStats>>,
-    func_cmp_map : HashMap<u32, Vec<u32>>,
-    func_id_map : HashMap<u32, String>,
+    func_cmp_map : Vec<Vec<u32>>,
+    func_id_map : Vec<String>,
     cid : usize,
 ) {
     let search_method = cmd_opt.search_method;
-    let mut func_rel_map : HashMap<u32, HashMap<u32, u32>> = HashMap::new();
-    for k1 in func_cmp_map.keys() {
-      let mut tmp_map = HashMap::new();
-      for k2 in func_cmp_map.keys() {
-        tmp_map.insert(*k2, 0);
+    let mut func_rel_map : Vec<Vec<u32>> = vec![];
+    for _i in 0..func_cmp_map.len() {
+      let mut tmp_vec = vec![];
+      for _j in 0..func_cmp_map.len() {
+        tmp_vec.push(0);
       }
-      func_rel_map.insert(*k1, tmp_map);
-    }
+      func_rel_map.push(tmp_vec);
+    };
 
     let mut executor = Executor::new(
         cmd_opt,

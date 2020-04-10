@@ -68,9 +68,7 @@ pub fn fuzz_main(
         global_branches.clone(),
         depot.clone(),
         stats.clone(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
+        vec![], vec![], vec![],
         255
     );
 
@@ -137,20 +135,30 @@ pub fn fuzz_main(
 }
 
 
-fn get_func_maps (s : Option<&str>) -> (HashMap<u32, Vec<u32>>, HashMap<u32, String>) {
-  if s == None {return (HashMap::new(),HashMap::new())}
+fn get_func_maps (s : Option<&str>) -> (Vec<Vec<u32>>, Vec<String>) {
+  if s == None {return (vec![], vec![])}
   let mut ff = fs::File::open(s.unwrap()).expect("File not Found");
   let mut conts = String::new();
   ff.read_to_string(&mut conts).expect("Can't read file");
-  let mut func_cmp_map : HashMap<u32, Vec<u32>> = HashMap::new();
-  let mut func_id_map : HashMap<u32,String> = HashMap::new();
+  let mut func_cmp_map : Vec<Vec<u32>> = vec![];
+  let mut func_id_map : Vec<String> = vec![];
   let mut cmplist : Vec<u32> = Vec::new();
   let mut funcname = String::new();
   let mut cmpid = String::new();
   let mut func_id = 0;
-  let mut stage = 0; // 0 for funcname, 1 for tmp, 2 for cmp
+  let mut stage = -1; // 0 for funcname, 1 for tmp, 2 for cmp
   for c in conts.chars() {
     match &stage {
+      -1 => { if c == '\n' {
+                let num_func = funcname.parse::<usize>().unwrap();
+                func_cmp_map = vec![vec![]; num_func];
+                func_id_map = vec![String::new(); num_func];
+                funcname = String::new();
+                stage = 0;
+              } else {
+                funcname.push(c);
+              }
+            },
       0 => { if c == ',' {
                stage = 1;
              } else {
@@ -160,8 +168,8 @@ fn get_func_maps (s : Option<&str>) -> (HashMap<u32, Vec<u32>>, HashMap<u32, Str
       1 => { if c == '\n' { stage = 2; } },
       2 => { if c == '\n' {
                stage = 0;
-               func_cmp_map.insert(func_id, cmplist);
-               func_id_map.insert(func_id,funcname);
+               func_cmp_map[func_id] = cmplist;
+               func_id_map[func_id] = funcname;
                func_id += 1;
                funcname = String::new();
                cmplist = Vec::new();
@@ -267,8 +275,8 @@ fn init_cpus_and_run_fuzzing_threads(
     global_branches: &Arc<branches::GlobalBranches>,
     depot: &Arc<depot::Depot>,
     stats: &Arc<RwLock<stats::ChartStats>>,
-    func_cmp_map : &HashMap<u32, Vec<u32>>,
-    func_id_map : &HashMap<u32, String>,
+    func_cmp_map : &Vec<Vec<u32>>,
+    func_id_map : &Vec<String>,
 ) -> (Vec<thread::JoinHandle<()>>, Arc<AtomicUsize>) {
     let child_count = Arc::new(AtomicUsize::new(0));
     let mut handlers = vec![];

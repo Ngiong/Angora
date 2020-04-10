@@ -1,5 +1,5 @@
 use super::*;
-use crate::{cond_stmt::CondStmt, executor::StatusType};
+use crate::{cond_stmt::CondStmt, executor::StatusType, get_rel::get_rel_func_list};
 use rand;
 use std::{
     fs,
@@ -10,7 +10,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Mutex,
     },
-    collections::{HashMap,HashSet},
+    collections::HashSet,
 };
 use angora_common::config;
 // https://crates.io/crates/priority-queue
@@ -24,29 +24,15 @@ pub struct Depot {
     pub dirs: DepotDir,
 }
 
-fn get_func_rel_score(cmpid : u32, conds_set : &HashSet<u32>, func_rel_map : &HashMap<u32, HashMap<u32, u32>>, func_cmp_map : &HashMap<u32, Vec<u32>>) -> f32 {
-  let mut cmp_func : u32 = 0;
-  for (k, v2) in func_cmp_map{
-    if v2.contains(&cmpid) {cmp_func = *k; break;}
-  };
-  let rels : &HashMap<u32, u32> = match func_rel_map.get(&cmp_func) { Some(h) => h, None => return 0.0 };
-  let mut rel_list : Vec<(u32, u32)> = Vec::new();
-  let mut target_runs = 0;
-  for (k, v2) in rels{
-    rel_list.push((*k, *v2));
-    if *k == cmp_func { target_runs = *v2;}
+fn get_func_rel_score(cmpid : u32, exec_func_set : &HashSet<usize>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>) -> f32 {
+  let mut count = 0;
+  let func_list = get_rel_func_list(cmpid, func_cmp_map, func_rel_map);
+  for f in func_list {
+    if exec_func_set.contains(&f) {
+      count += 1;
+    }
   }
-  rel_list.retain(|x| (x.1 as f64 / target_runs as f64) > config::FUNC_REL_HIGH_THRESHOLD);
-  let mut cmp_set = HashSet::new();
-  for (rel_func, _rel) in rel_list {
-    let rel_cmp_list = func_cmp_map.get(&rel_func).unwrap().clone();
-    for rel_cmp in rel_cmp_list {
-      cmp_set.insert(rel_cmp);
-    };
-  };
-  let inter : HashSet<_> = cmp_set.intersection(conds_set).collect();
-  let inter_len = inter.len();
-  (inter_len as f32) / (conds_set.len() as f32) 
+  (count as f32) / (exec_func_set.len() as f32) 
 }
 
 impl Depot {
@@ -140,7 +126,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &HashMap<u32, HashMap<u32, u32>>, func_cmp_map : &HashMap<u32, Vec<u32>>) {
+    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -149,8 +135,16 @@ impl Depot {
             },
         };
         let mut conds_set = HashSet::new();
+        
         for cond in &conds {
           conds_set.insert(cond.base.cmpid);
+        }
+
+        let mut exec_func_set = HashSet::new();
+        for c in conds_set {
+          for (i,f) in func_cmp_map.iter().enumerate() {
+            if f.contains(&c) { exec_func_set.insert(i);}
+          }
         }
         for mut cond in conds {
             if cond.is_desirable {
@@ -169,7 +163,7 @@ impl Depot {
                             // we prefer the faster one.
                             let mut new_fr_score = v.0.func_rel_score.clone();
                             if config::TC_SEL_FUNC_REL {
-                              let func_rel_score = get_func_rel_score(cond.base.cmpid, &conds_set, func_rel_map, func_cmp_map);
+                              let func_rel_score = get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map);
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
                                 if fr.0 < func_rel_score {
@@ -203,7 +197,7 @@ impl Depot {
                 } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
                     if config::TC_SEL_FUNC_REL {
-                      cond.func_rel_score.push((get_func_rel_score(cond.base.cmpid, &conds_set, func_rel_map, func_cmp_map)
+                      cond.func_rel_score.push((get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map)
                                                 ,cond.base.belong));
                     };
                     if config::TC_SEL_RANDOM {

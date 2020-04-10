@@ -871,8 +871,9 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
 
   std::ofstream func;
   if (FastMode){
-    func.open("FuncInfo.txt", std::ofstream::out | std::ofstream::app);
+    func.open("tmp_llvm.txt", std::ofstream::out | std::ofstream::app);
   }
+  int num_func = 0;
   for (auto &F : M) {
     if (F.isDeclaration())
       continue;
@@ -916,6 +917,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     }
     if ((cmp_list.size() >= FUNC_CMP_SIZE) && FastMode){
       func << F.getName().str() << "," << cmp_list.size() << "\n";
+      num_func ++;
       for (auto i = cmp_list.begin(); i != cmp_list.end(); i++){
         func << *i << ",";
       }
@@ -923,7 +925,16 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     }
   }
   if (FastMode) {
-    func.close();
+   func.close();
+   std::ifstream func2("tmp_llvm.txt");
+   std::ofstream func3("FuncInfo.txt");
+   std::string readline;
+   func3 << num_func << "\n";
+   while( std::getline(func2, readline)) {
+     func3 << readline << "\n";
+   }
+   func2.close();
+   func3.close();
   }
 
   if (is_bc)

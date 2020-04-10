@@ -23,4 +23,6 @@ mod check_dep;
 mod command;
 mod tmpfs;
 
+mod get_rel;
+
 pub use crate::fuzz_main::fuzz_main;
