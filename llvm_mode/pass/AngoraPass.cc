@@ -926,7 +926,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
    func.close();
    std::ifstream func2("tmp_llvm.txt");
    std::string readline;
-   int num_func;
+   int num_func = 0;
    while(std::getline(func2, readline)) {
      num_func ++;
    }
