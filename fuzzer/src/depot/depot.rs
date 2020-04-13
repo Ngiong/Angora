@@ -166,7 +166,7 @@ impl Depot {
                               let func_rel_score = get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map);
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
-                                if fr.0 < func_rel_score {
+                                if fr.0 == std::f32::NAN || fr.0 < func_rel_score {
                                   new_fr_score.insert(i, (func_rel_score, cond.base.belong));
                                   inserted = true;
                                   break;
