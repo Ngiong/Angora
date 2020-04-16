@@ -1,5 +1,5 @@
 use super::*;
-use crate::{cond_stmt::CondStmt, executor::StatusType, get_rel::get_rel_func_list};
+use crate::{cond_stmt::CondStmt, executor::StatusType, get_rel::get_rel_func_list, belongs::*};
 use rand;
 use std::{
     fs,
@@ -12,7 +12,7 @@ use std::{
     },
     collections::HashSet,
 };
-use angora_common::config;
+use angora_common::{config, defs};
 // https://crates.io/crates/priority-queue
 use priority_queue::PriorityQueue;
 
@@ -180,8 +180,8 @@ impl Depot {
                                 cond.func_rel_score = new_fr_score;
                                 cond.executed_belongs = v.0.executed_belongs.clone();
                                 if config::TC_SEL_RANDOM {
-                                  cond.belongs = v.0.belongs.clone();
-                                  cond.belongs.insert(cond.base.belong);
+                                  let belongs_path = self.dirs.inputs_dir.parent().unwrap().join(defs::BELONGS_DIR);
+                                  write_belongs(belongs_path, cond.base.cmpid, cond.base.belong);
                                 }
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
@@ -189,7 +189,8 @@ impl Depot {
                             } else {
                               v.0.func_rel_score = new_fr_score;
                               if config::TC_SEL_RANDOM {
-                                v.0.belongs.insert(cond.base.belong);
+                                let belongs_path = self.dirs.inputs_dir.parent().unwrap().join(defs::BELONGS_DIR);
+                                write_belongs(belongs_path, v.0.base.cmpid, cond.base.belong);
                               }
                             }
                         }
@@ -201,7 +202,8 @@ impl Depot {
                                                 ,cond.base.belong));
                     };
                     if config::TC_SEL_RANDOM {
-                      cond.belongs.insert(cond.base.belong);
+                      let belongs_path = self.dirs.inputs_dir.parent().unwrap().join(defs::BELONGS_DIR);
+                      write_belongs(belongs_path, cond.base.cmpid, cond.base.belong);
                     };
                     q.push(cond, priority);
                 }

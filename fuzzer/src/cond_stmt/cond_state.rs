@@ -1,4 +1,4 @@
-use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats, get_rel::get_rel_cmp_set};
+use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats, get_rel::get_rel_cmp_set, belongs::*};
 use runtime::logger::get_log_data;
 use std::fmt;
 use std::sync::Arc;
@@ -334,12 +334,15 @@ impl NextState for CondStmt {
                           }
                         }
                         else if config::TC_SEL_RANDOM {
+                          let belongs_dir = taint_dir.clone().parent().unwrap().join(defs::BELONGS_DIR);
+                          let belongs = read_belongs(belongs_dir, self.base.cmpid);
                           let mut rng = thread_rng();
-                          rng.gen_range(0,self.belongs.len() as u32)
+                          belongs[rng.gen_range(0,belongs.len() as u32) as usize]
                         } else {
                           panic!("to_next_belong called with unproper configuration!");
                         };
 
+      info!("trying with new belong : {}", next_belong);
       let taint_file_path = taint_dir.clone().join(format!("taints_{}", next_belong));
       let taint_file = Path::new(&taint_file_path);
       let log_data = match get_log_data(taint_file) {

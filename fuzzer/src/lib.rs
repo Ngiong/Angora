@@ -24,5 +24,6 @@ mod command;
 mod tmpfs;
 
 mod get_rel;
+mod belongs;
 
 pub use crate::fuzz_main::fuzz_main;
