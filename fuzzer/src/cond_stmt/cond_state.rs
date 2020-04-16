@@ -337,7 +337,7 @@ impl NextState for CondStmt {
                           let belongs_dir = taint_dir.clone().parent().unwrap().join(defs::BELONGS_DIR);
                           let belongs = read_belongs(belongs_dir, self.base.cmpid);
                           let mut rng = thread_rng();
-                          let next_b = belongs[rng.gen_range(0,belongs.len() as u32) as usize]
+                          let next_b = belongs[rng.gen_range(0,belongs.len() as u32) as usize];
                           if self.executed_belongs.contains(&next_b) {
                             return;
                           } else {
