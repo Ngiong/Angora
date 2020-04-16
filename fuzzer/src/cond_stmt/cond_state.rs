@@ -337,12 +337,16 @@ impl NextState for CondStmt {
                           let belongs_dir = taint_dir.clone().parent().unwrap().join(defs::BELONGS_DIR);
                           let belongs = read_belongs(belongs_dir, self.base.cmpid);
                           let mut rng = thread_rng();
-                          belongs[rng.gen_range(0,belongs.len() as u32) as usize]
+                          let next_b = belongs[rng.gen_range(0,belongs.len() as u32) as usize]
+                          if self.executed_belongs.contains(&next_b) {
+                            return;
+                          } else {
+                            next_b
+                          }
                         } else {
                           panic!("to_next_belong called with unproper configuration!");
                         };
 
-      info!("trying with new belong : {}", next_belong);
       let taint_file_path = taint_dir.clone().join(format!("taints_{}", next_belong));
       let taint_file = Path::new(&taint_file_path);
       let log_data = match get_log_data(taint_file) {
