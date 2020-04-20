@@ -97,7 +97,6 @@ pub fn fuzz_main(
     );
    
     let taints_dir = angora_out_dir.join(defs::TAINTS_DIR);
-    let belongs_dir = angora_out_dir.join(defs::BELONGS_DIR);
 
     let log_file = match fs::File::create(angora_out_dir.join(defs::ANGORA_LOG_FILE)) {
         Ok(a) => a,
@@ -128,13 +127,6 @@ pub fn fuzz_main(
     match fs::remove_dir_all(&taints_dir) {
        Ok(_) => (),
        Err(e) => warn!("Could not remove the taints dir : {:?}", e),
-    }
-
-    if config::TC_SEL_RANDOM {
-       match fs::remove_dir_all(&belongs_dir) {
-         Ok(_) => (),
-         Err(e) => warn!("Could not remove the belongs dir : {:?}", e),
-       }
     }
 
     match fs::remove_file(&fuzzer_stats) {
@@ -220,9 +212,6 @@ fn initialize_directories(in_dir: &str, out_dir: &str, sync_afl: bool) -> (PathB
     
     let taints_dir = out_dir.join(defs::TAINTS_DIR);
     fs::create_dir(&taints_dir).unwrap();
-    let belongs_dir = out_dir.join(defs::BELONGS_DIR);
-    fs::create_dir(&belongs_dir).unwrap();
-
 
     (seeds_dir, angora_out_dir)
 }

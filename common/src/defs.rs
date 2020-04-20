@@ -22,7 +22,6 @@ pub static HANGS_DIR: &str = "hangs";
 pub static INPUTS_DIR: &str = "queue";
 
 pub static TAINTS_DIR: &str = "taints";
-pub static BELONGS_DIR: &str = "belongs";
 
 // forksrv.rs
 pub static ENABLE_FORKSRV: &str = "ANGORA_ENABLE_FORKSRV";

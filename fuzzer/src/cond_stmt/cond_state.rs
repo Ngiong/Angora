@@ -1,4 +1,4 @@
-use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats, get_rel::get_rel_cmp_set, belongs::*};
+use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats, get_rel::get_rel_cmp_set};
 use runtime::logger::get_log_data;
 use std::fmt;
 use std::sync::Arc;
@@ -320,7 +320,7 @@ impl NextState for CondStmt {
 
     fn to_next_belong(&mut self, taint_dir : &PathBuf) {
       self.executed_belongs.insert(self.base.belong);
-      let next_belong = if config::TC_SEL_FUNC_REL {
+      let next_belong = if config::TC_SEL_RANDOM || config::TC_SEL_FUNC_REL {
                           let mut nb = None;
                           for frs in &self.func_rel_score {
                             if !self.executed_belongs.contains(&frs.1) {
@@ -331,17 +331,6 @@ impl NextState for CondStmt {
                           match nb {
                             Some(b) => {b},
                             None => {return;}
-                          }
-                        }
-                        else if config::TC_SEL_RANDOM {
-                          let belongs_dir = taint_dir.clone().parent().unwrap().join(defs::BELONGS_DIR);
-                          let belongs = read_belongs(belongs_dir, self.base.cmpid);
-                          let mut rng = thread_rng();
-                          let next_b = belongs[rng.gen_range(0,belongs.len() as u32) as usize];
-                          if self.executed_belongs.contains(&next_b) {
-                            return;
-                          } else {
-                            next_b
                           }
                         } else {
                           panic!("to_next_belong called with unproper configuration!");

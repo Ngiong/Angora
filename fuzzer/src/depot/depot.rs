@@ -1,6 +1,7 @@
 use super::*;
-use crate::{cond_stmt::CondStmt, executor::StatusType, get_rel::get_rel_func_list, belongs::*};
+use crate::{cond_stmt::CondStmt, executor::StatusType, get_rel::get_rel_func_list};
 use rand;
+use rand::{thread_rng, Rng};
 use std::{
     fs,
     io::prelude::*,
@@ -12,7 +13,7 @@ use std::{
     },
     collections::HashSet,
 };
-use angora_common::{config, defs};
+use angora_common::config;
 // https://crates.io/crates/priority-queue
 use priority_queue::PriorityQueue;
 
@@ -25,6 +26,11 @@ pub struct Depot {
 }
 
 fn get_func_rel_score(cmpid : u32, exec_func_set : &HashSet<usize>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>) -> f32 {
+  if config::TC_SEL_RANDOM {
+    let mut rng = thread_rng(); 
+    let res : f32 = rng.gen_range(0.0, 1.0);
+    return res;
+  }
   let mut count = 0;
   let func_list = get_rel_func_list(cmpid, func_cmp_map, func_rel_map);
   for f in func_list {
@@ -162,7 +168,7 @@ impl Depot {
                             // If the cond is faster than the older one,
                             // we prefer the faster one.
                             let mut new_fr_score = v.0.func_rel_score.clone();
-                            if config::TC_SEL_FUNC_REL {
+                            if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                               let func_rel_score = get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map);
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
@@ -179,31 +185,19 @@ impl Depot {
                             if v.0.speed > cond.speed {
                                 cond.func_rel_score = new_fr_score;
                                 cond.executed_belongs = v.0.executed_belongs.clone();
-                                if config::TC_SEL_RANDOM {
-                                  let belongs_path = self.dirs.inputs_dir.parent().unwrap().join(defs::BELONGS_DIR);
-                                  write_belongs(belongs_path, cond.base.cmpid, cond.base.belong);
-                                }
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
                             } else {
                               v.0.func_rel_score = new_fr_score;
-                              if config::TC_SEL_RANDOM {
-                                let belongs_path = self.dirs.inputs_dir.parent().unwrap().join(defs::BELONGS_DIR);
-                                write_belongs(belongs_path, v.0.base.cmpid, cond.base.belong);
-                              }
                             }
                         }
                     }
                 } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
-                    if config::TC_SEL_FUNC_REL {
+                    if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                       cond.func_rel_score.push((get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map)
                                                 ,cond.base.belong));
-                    };
-                    if config::TC_SEL_RANDOM {
-                      let belongs_path = self.dirs.inputs_dir.parent().unwrap().join(defs::BELONGS_DIR);
-                      write_belongs(belongs_path, cond.base.cmpid, cond.base.belong);
                     };
                     q.push(cond, priority);
                 }

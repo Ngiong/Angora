@@ -60,6 +60,6 @@ pub const BYTE_EXT_FUNC_REL : bool = false;
 pub const BYTE_EXT_RANDOM : bool = false;
 
 pub const FUNC_CMP_SIZE : usize = 1;
-pub const STMT_BELONGS_LIMIT : usize = 8;
+pub const STMT_BELONGS_LIMIT : usize = 16;
 
 pub const STATE_LONG_FUZZ_TIME : [u32; 5] = [8,1,1,8,8];  //first,second,merged,func,func_rel
