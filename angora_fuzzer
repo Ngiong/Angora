@@ -15,5 +15,5 @@ fuzzer="${FUZZ_DIR}/target/${BUILD_TYPE}/fuzzer"
 
 cmd="$envs $fuzzer $*"
 
-#echo $cmd
+echo $cmd
 eval $cmd

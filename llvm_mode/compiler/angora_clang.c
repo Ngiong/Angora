@@ -286,10 +286,12 @@ static void edit_params(u32 argc, char **argv) {
     }
   }
 
+  cc_params[cc_par_cnt++] = "-g";
   if (!getenv("ANGORA_DONT_OPTIMIZE")) {
-    cc_params[cc_par_cnt++] = "-g";
     cc_params[cc_par_cnt++] = "-O3";
     cc_params[cc_par_cnt++] = "-funroll-loops";
+  } else {
+    cc_params[cc_par_cnt++] = "-O1";
   }
 
   /*
@@ -425,12 +427,12 @@ int main(int argc, char **argv) {
   find_obj(argv[0]);
 
   edit_params(argc, argv);
-  /*
+  
   for (int i = 0; i < cc_par_cnt; i++) {
     printf("%s ", cc_params[i]);
   }
   printf("\n");
-  */
+  
  
   execvp(cc_params[0], (char **)cc_params);
 
