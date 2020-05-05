@@ -413,8 +413,10 @@ impl Executor {
             self.cmd.mode.is_pin_mode(),
             self.cmd.enable_exploitation,
         );
-        if let Err(_) = fs::copy(&track_path, &taint_path) {
-          println!("can't copy taint file");
+        if config::TC_SEL_FUNC_REL {
+          if let Err(_) = fs::copy(&track_path, &taint_path) {
+            println!("can't copy taint file");
+          }
         }
         self.local_stats.track_time += t_now.into();
         cond_list
