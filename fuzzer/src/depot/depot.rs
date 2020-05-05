@@ -132,7 +132,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>) {
+    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>, taint_files : &mut HashSet<u32>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -152,6 +152,8 @@ impl Depot {
             if f.contains(&c) { exec_func_set.insert(i);}
           }
         }
+        let mut inserted_all = false;
+        let belong = conds[0].base.belong;
         for mut cond in conds {
             if cond.is_desirable {
                 if let Some(v) = q.get_mut(&cond) {
@@ -173,13 +175,15 @@ impl Depot {
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
                                 if fr.0 == std::f32::NAN || fr.0 < func_rel_score {
-                                  new_fr_score.insert(i, (func_rel_score, cond.base.belong));
+                                  new_fr_score.insert(i, (func_rel_score, belong));
                                   inserted = true;
+                                  inserted_all = true;
                                   break;
                                 };
                               };
                               if !inserted && new_fr_score.len() < config::STMT_BELONGS_LIMIT {
-                                new_fr_score.push((func_rel_score, cond.base.belong));
+                                new_fr_score.push((func_rel_score, belong));
+                                inserted_all = true;
                               } else if new_fr_score.len() > config::STMT_BELONGS_LIMIT { new_fr_score.pop();};
                             };
                             if v.0.speed > cond.speed {
@@ -197,11 +201,21 @@ impl Depot {
                     let priority = QPriority::init(cond.base.op);
                     if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                       cond.func_rel_score.push((get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map)
-                                                ,cond.base.belong));
+                                                ,belong));
+                      inserted_all = true;
                     };
                     q.push(cond, priority);
                 }
             }
+        }
+        if inserted_all {
+          taint_files.insert(belong);
+        } else if !taint_files.contains(&belong){
+          let taint_path = self.dirs.crashes_dir.clone().parent().unwrap().join("taints").join(format!("taints_{}", belong));
+          match fs::remove_file(taint_path) {
+            Ok(_) => (),
+            Err(e) => warn!("Could not remove taint file : {:?}", e),
+          }
         }
     }
 

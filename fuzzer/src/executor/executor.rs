@@ -43,6 +43,7 @@ pub struct Executor {
     pub func_uniq_call_set : HashSet<Vec<u32>>,
     pub func_executed : Vec<usize>,
     pub cid : usize,
+    pub taint_files : HashSet<u32>,
 }
 
 impl Executor {
@@ -118,6 +119,7 @@ impl Executor {
             func_uniq_call_set : HashSet::new(),
             func_executed : vec![],
             cid : cid,
+            taint_files : HashSet::new(),
         }
     }
 
@@ -148,7 +150,7 @@ impl Executor {
         {
             cond.is_consistent = false;
             //warn!("inconsistent : {:?}", cond);
-            warn!("inconsistent : ");
+            //warn!("inconsistent : ");
         }
     }
 
@@ -278,7 +280,7 @@ impl Executor {
                 if !crash_or_tmout {
                     let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
-                        self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &self.func_cmp_map);
+                        self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &self.func_cmp_map, &mut self.taint_files);
                         if !self.rel_rec_set.contains(&id) && (self.func_rel_map.len() != 0) {
                           self.get_func_and_record(cond_stmts);
                           self.rel_rec_set.insert(id);
@@ -287,7 +289,7 @@ impl Executor {
                             self.depot
                                 .add_entries(vec![cond_stmt::CondStmt::get_afl_cond(
                                     id, speed, edge_num,
-                                )], &self.func_rel_map, &self.func_cmp_map);
+                                )], &self.func_rel_map, &self.func_cmp_map, &mut self.taint_files);
                         }
                     }
                 }
