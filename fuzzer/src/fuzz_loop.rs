@@ -15,31 +15,20 @@ pub fn fuzz_loop(
     depot: Arc<Depot>,
     global_branches: Arc<GlobalBranches>,
     global_stats: Arc<RwLock<stats::ChartStats>>,
-    func_cmp_map : Vec<Vec<u32>>,
-    func_id_map : Vec<String>,
+    func_num : usize,
     cid : usize,
 ) {
     let search_method = cmd_opt.search_method;
-    let mut func_rel_map : Vec<Vec<u32>> = vec![];
-    for _i in 0..func_cmp_map.len() {
-      let mut tmp_vec = vec![];
-      for _j in 0..func_cmp_map.len() {
-        tmp_vec.push(0);
-      }
-      func_rel_map.push(tmp_vec);
-    };
 
+    
     let mut executor = Executor::new(
         cmd_opt,
         global_branches,
         depot.clone(),
         global_stats.clone(),
-        func_rel_map,
-        func_cmp_map,
-        func_id_map,
+        func_num,
         cid,
     );
-    
 
     while running.load(Ordering::Relaxed) {
         let entry = match depot.get_entry() {
@@ -75,7 +64,7 @@ pub fn fuzz_loop(
                     if handler.cond.is_time_expired() {
                       //If it is not the first time, move to next state
                         handler.cond.next_state(&depot, &mut handler.executor.local_stats, &handler.executor.cmd.taint_dir,
-                                                        &handler.executor.func_cmp_map, &handler.executor.func_rel_map);
+                                                        &handler.executor.func_rel_map);
                     }
                     if handler.cond.state.is_one_byte() { //Only one byte to fuzz for this condition.
                         OneByteFuzz::new(handler).run();

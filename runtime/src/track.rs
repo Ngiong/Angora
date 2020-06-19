@@ -48,6 +48,7 @@ pub extern "C" fn __dfsw___angora_trace_cmp_tt(
     arg1: u64,
     arg2: u64,
     condition: u32,
+    func_id : u32,
     _l0: DfsanLabel,
     _l1: DfsanLabel,
     _l2: DfsanLabel,
@@ -68,7 +69,7 @@ pub extern "C" fn __dfsw___angora_trace_cmp_tt(
     infer_shape(lb1, size);
     infer_shape(lb2, size);
 
-    log_cmp(cmpid, context, condition, op, size, lb1, lb2, arg1, arg2);
+    log_cmp(cmpid, context, condition, op, size, lb1, lb2, arg1, arg2, func_id);
 }
 
 #[no_mangle]
@@ -92,6 +93,7 @@ pub extern "C" fn __dfsw___angora_trace_switch_tt(
     condition: u64,
     num: u32,
     args: *mut u64,
+    func_id : u32,
     _l0: DfsanLabel,
     _l1: DfsanLabel,
     _l2: DfsanLabel,
@@ -116,6 +118,7 @@ pub extern "C" fn __dfsw___angora_trace_switch_tt(
         context,
         order: 0,
         belong: 0,
+        belong_func : func_id,
         condition: defs::COND_FALSE_ST,
         level: 0,
         op,
@@ -160,6 +163,7 @@ pub extern "C" fn __dfsw___angora_trace_fn_tt(
     size: u32,
     parg1: *mut i8,
     parg2: *mut i8,
+    func_id : u32,
     _l0: DfsanLabel,
     _l1: DfsanLabel,
     _l2: DfsanLabel,
@@ -187,6 +191,7 @@ pub extern "C" fn __dfsw___angora_trace_fn_tt(
         context,
         order: 0,
         belong: 0,
+        belong_func : func_id,
         condition: defs::COND_FALSE_ST,
         level: 0,
         op: defs::COND_FN_OP,
@@ -229,6 +234,7 @@ pub extern "C" fn __dfsw___angora_trace_exploit_val_tt(
     size: u32,
     op: u32,
     val: u64,
+    func_id : u32,
     _l0: DfsanLabel,
     _l1: DfsanLabel,
     _l2: DfsanLabel,
@@ -240,7 +246,7 @@ pub extern "C" fn __dfsw___angora_trace_exploit_val_tt(
         return;
     }
 
-    log_cmp(cmpid, context, defs::COND_FALSE_ST, op, size, lb, 0, val, 0);
+    log_cmp(cmpid, context, defs::COND_FALSE_ST, op, size, lb, 0, val, 0, func_id);
 }
 
 #[inline]
@@ -254,12 +260,14 @@ fn log_cmp(
     lb2: u32,
     arg1: u64,
     arg2: u64,
+    func_id : u32,
 ) {
     let cond = CondStmtBase {
         cmpid,
         context,
         order: 0,
         belong: 0,
+        belong_func : func_id,
         condition,
         level: 0,
         op,

@@ -1,10 +1,11 @@
-use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats, get_rel::get_rel_cmp_set};
+use crate::{cond_stmt::CondStmt, mut_input::offsets::*, stats, get_rel::get_rel_func_list};
 use runtime::logger::get_log_data;
 use std::fmt;
 use std::sync::Arc;
 use std::collections::HashSet;
 use std::time::Instant;
 use std::path::{Path, PathBuf};
+use std::ops::Deref;
 use crate::depot::Depot;
 use angora_common::{config, defs, tag::TagSeg};
 use rand::{thread_rng, Rng};
@@ -106,8 +107,7 @@ impl fmt::Display for CondState {
 
 pub trait NextState {
     fn next_state(&mut self, depot : &Arc<Depot>, local_stat : &mut stats::LocalStats, taint_dir : &PathBuf,
-                    func_cmp_map : &Vec<Vec<u32>>,
-                    func_rel_map : &Vec<Vec<u32>>);
+                  func_rel_map : &Box<[Box<[usize]>]>);
     fn to_offsets_opt(&mut self);
     fn to_offsets_all(&mut self);
     fn to_offsets_all_end(&mut self);
@@ -115,13 +115,11 @@ pub trait NextState {
     fn to_offsets_func(&mut self, depot : &Arc<Depot>,
                                   local_stats : &mut stats::LocalStats,
                                   taint_dir : &PathBuf,
-                                  func_cmp_map : &Vec<Vec<u32>>,
-                                  func_rel_map : &Vec<Vec<u32>>);
+                                  func_rel_map : &Box<[Box<[usize]>]>);
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
                                       local_stats : &mut stats::LocalStats,
                                       taint_dir : &PathBuf,
-                                      func_cmp_map : &Vec<Vec<u32>>,
-                                      func_rel_map : &Vec<Vec<u32>>);
+                                      func_rel_map : &Box<[Box<[usize]>]>);
     fn to_unsolvable(&mut self);
     fn to_timeout(&mut self);
     fn to_next_belong(&mut self, taint_dir : &PathBuf);
@@ -132,8 +130,7 @@ impl NextState for CondStmt {
     fn next_state(&mut self, depot : &Arc<Depot>,
                              local_stats : &mut stats::LocalStats,
                              taint_dir : &PathBuf,
-                             func_cmp_map : &Vec<Vec<u32>>,
-                             func_rel_map : &Vec<Vec<u32>>) {
+                             func_rel_map : &Box<[Box<[usize]>]>) {
         self.cur_state_fuzz_times = 0;
         match self.state {
             CondState::Offset => {
@@ -147,7 +144,7 @@ impl NextState for CondStmt {
                 if self.offsets_opt.len() > 0 {
                     self.to_offsets_opt();
                 } else if config::BYTE_EXT_FUNC_REL || config::BYTE_EXT_RANDOM {
-                    self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
+                    self.to_offsets_func(depot, local_stats, taint_dir, func_rel_map);
                 } else if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                     self.to_next_belong(taint_dir);
                 } else {
@@ -162,7 +159,7 @@ impl NextState for CondStmt {
             },
             CondState::Deterministic => {
                 if config::BYTE_EXT_FUNC_REL || config::BYTE_EXT_RANDOM {
-                  self.to_offsets_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
+                  self.to_offsets_func(depot, local_stats, taint_dir,  func_rel_map);
                 } else if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
                   self.to_next_belong(taint_dir);
                 } else {
@@ -170,7 +167,7 @@ impl NextState for CondStmt {
                 }
             },
             CondState::OffsetFunc => {
-                  self.to_offsets_rel_func(depot, local_stats, taint_dir, func_cmp_map, func_rel_map);
+                  self.to_offsets_rel_func(depot, local_stats, taint_dir, func_rel_map);
             },
             CondState::OffsetRelFunc => {
                if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
@@ -215,17 +212,14 @@ impl NextState for CondStmt {
       selected
     }
     
-    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats, taint_dir : &PathBuf, func_cmp_map : &Vec<Vec<u32>>, func_rel_map : &Vec<Vec<u32>>) {
+    fn to_offsets_func(&mut self, depot : &Arc<Depot>, local_stats : &mut stats::LocalStats,
+                       taint_dir : &PathBuf, func_rel_map : &Box<[Box<[usize]>]>) {
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         let start_time = Instant::now();
         self.state = CondState::OffsetFunc;
-        if func_cmp_map.len() == 0 { return; }
-        let mut cur_func = 0;
-        //get the list of cmps in the same function
-        for (i, v) in func_cmp_map.iter().enumerate() {
-          if v.contains(&self.base.cmpid) { cur_func = i; break; }
-        };
-        let cmp_list = &func_cmp_map[cur_func];
+        if func_rel_map.len() == 0 { return; }
+        let cur_func = self.base.belong_func;
+
         let taint_file_path = taint_dir.clone().join(format!("taints_{}", self.base.belong));
         let taint_file = Path::new(&taint_file_path);
         let log_data = match get_log_data(taint_file) {
@@ -235,10 +229,11 @@ impl NextState for CondStmt {
             return;
           },
         };
+
         let mut new_offsets = vec![];
         let mut lb_set = HashSet::new();
         for cond_base in log_data.cond_list.iter() {
-          if cmp_list.contains(&cond_base.cmpid) {
+          if cond_base.belong_func == cur_func {
             lb_set.insert(cond_base.lb1);
             lb_set.insert(cond_base.lb2);
           }
@@ -262,22 +257,21 @@ impl NextState for CondStmt {
         let ext_size = self.get_offset_len() + self.get_offset_opt_len() - before_size;
         self.ext_offset_size += ext_size;
         local_stats.func_time += start_time.elapsed().into();
-        if ext_size == 0 {self.next_state(depot,local_stats, taint_dir, func_cmp_map, func_rel_map);}; 
+        if ext_size == 0 {self.next_state(depot,local_stats, taint_dir, func_rel_map);}; 
     }
  
     fn to_offsets_rel_func(&mut self, depot : &Arc<Depot>,
                                       local_stats : &mut stats::LocalStats,
                                       taint_dir : &PathBuf,
-                                      func_cmp_map : &Vec<Vec<u32>>,
-                                      func_rel_map : &Vec<Vec<u32>>){
+                                      func_rel_map : &Box<[Box<[usize]>]>){
 
         self.state = CondState::OffsetRelFunc;
         let before_size = self.get_offset_len() + self.get_offset_opt_len();
         let start_time = Instant::now();
-        if func_cmp_map.len() == 0 {return ;}
+        if func_rel_map.deref().len() == 0 {return ;}
+
+        let rel_func_list = get_rel_func_list(self.base.belong_func as usize, func_rel_map);
    
-        let cmp_set = get_rel_cmp_set(self.base.cmpid, func_cmp_map, func_rel_map);
-        
         let taint_file_path = taint_dir.clone().join(format!("taints_{}", self.base.belong));
         let taint_file = Path::new(&taint_file_path);
 
@@ -291,7 +285,7 @@ impl NextState for CondStmt {
         let mut new_offsets = vec![];
         let mut lb_set = HashSet::new();
         for cond_base in log_data.cond_list.iter() {
-          if cmp_set.contains(&cond_base.cmpid) {
+          if rel_func_list.contains(& (cond_base.belong_func as usize)) {
             lb_set.insert(cond_base.lb1);
             lb_set.insert(cond_base.lb2);
           }
@@ -315,7 +309,7 @@ impl NextState for CondStmt {
         let after_size = self.get_offset_len() + self.get_offset_opt_len();
         self.ext_offset_size_rel += after_size - before_size;
         local_stats.func_time += start_time.elapsed().into();
-        if (after_size - before_size) == 0 {self.next_state(depot,local_stats,taint_dir,func_cmp_map,func_rel_map);}
+        if (after_size - before_size) == 0 {self.next_state(depot,local_stats,taint_dir, func_rel_map);}
     }
 
     fn to_next_belong(&mut self, taint_dir : &PathBuf) {

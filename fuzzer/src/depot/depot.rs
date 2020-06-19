@@ -25,16 +25,16 @@ pub struct Depot {
     pub dirs: DepotDir,
 }
 
-fn get_func_rel_score(cmpid : u32, exec_func_set : &HashSet<usize>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>) -> f32 {
+fn get_func_rel_score(funcid : u32, exec_func_set : &HashSet<u32>, func_rel_map : &Box<[Box<[usize]>]>) -> f32 {
   if config::TC_SEL_RANDOM {
     let mut rng = thread_rng(); 
     let res : f32 = rng.gen_range(0.0, 1.0);
     return res;
   }
   let mut count = 0;
-  let func_list = get_rel_func_list(cmpid, func_cmp_map, func_rel_map);
+  let func_list = get_rel_func_list(funcid as usize, func_rel_map);
   for f in func_list {
-    if exec_func_set.contains(&f) {
+    if exec_func_set.contains(&(f as u32)) {
       count += 1;
     }
   }
@@ -132,7 +132,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &Vec<Vec<u32>>, func_cmp_map : &Vec<Vec<u32>>, taint_files : &mut HashSet<u32>) {
+    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &Box<[Box<[usize]>]>, taint_files : &mut HashSet<u32>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -140,17 +140,10 @@ impl Depot {
                 poisoned.into_inner()
             },
         };
-        let mut conds_set = HashSet::new();
-        
-        for cond in &conds {
-          conds_set.insert(cond.base.cmpid);
-        }
 
         let mut exec_func_set = HashSet::new();
-        for c in conds_set {
-          for (i,f) in func_cmp_map.iter().enumerate() {
-            if f.contains(&c) { exec_func_set.insert(i);}
-          }
+        for c in &conds {
+          exec_func_set.insert(c.base.belong_func);
         }
         let mut inserted_all = false;
         let belong = conds[0].base.belong;
@@ -171,7 +164,7 @@ impl Depot {
                             // we prefer the faster one.
                             let mut new_fr_score = v.0.func_rel_score.clone();
                             if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
-                              let func_rel_score = get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map);
+                              let func_rel_score = get_func_rel_score(cond.base.belong_func, &exec_func_set, func_rel_map);
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
                                 if fr.0 == std::f32::NAN || fr.0 < func_rel_score {
@@ -200,7 +193,7 @@ impl Depot {
                 } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
                     if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
-                      cond.func_rel_score.push((get_func_rel_score(cond.base.cmpid, &exec_func_set, func_rel_map, func_cmp_map)
+                      cond.func_rel_score.push((get_func_rel_score(cond.base.belong_func, &exec_func_set, func_rel_map)
                                                 ,belong));
                       inserted_all = true;
                     };

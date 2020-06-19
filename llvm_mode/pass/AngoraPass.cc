@@ -63,6 +63,7 @@ public:
   u32 CidCounter;
   unsigned long int RandSeed = 1;
   bool is_bc;
+  u32 CurFuncId = 0;
 
   // Const Variables
   DenseSet<u32> UniqCidSet;
@@ -126,16 +127,16 @@ public:
   Value *castArgType(IRBuilder<> &IRB, Value *V);
   void initVariables(Module &M);
   void countEdge(Module &M, BasicBlock &BB);
-  void visitCallInst(Instruction *Inst, std::vector<u32> &cmp_list);
-  void visitInvokeInst(Instruction *Inst, std::vector<u32> &cmp_list);
-  void visitCompareFunc(Instruction *Inst, std::vector<u32> &cmp_list);
-  void visitBranchInst(Instruction *Inst, std::vector<u32> &cmp_list);
-  void visitCmpInst(Instruction *Inst, std::vector<u32> & cmp_list);
+  void visitCallInst(Instruction *Inst);
+  void visitInvokeInst(Instruction *Inst);
+  void visitCompareFunc(Instruction *Inst);
+  void visitBranchInst(Instruction *Inst);
+  void visitCmpInst(Instruction *Inst);
   void processCmp(Instruction *Cond, Constant *Cid, Instruction *InsertPoint);
   void processBoolCmp(Value *Cond, Constant *Cid, Instruction *InsertPoint);
-  void visitSwitchInst(Module &M, Instruction *Inst, std::vector<u32> & cmp_list);
-  void visitExploitation(Instruction *Inst, std::vector<u32> & cmp_list);
-  void processCall(Instruction *Inst, std::vector<u32> &cmp_list);
+  void visitSwitchInst(Module &M, Instruction *Inst);
+  void visitExploitation(Instruction *Inst);
+  void processCall(Instruction *Inst);
   void addFnWrap(Function &F);
 };
 
@@ -286,8 +287,8 @@ void AngoraLLVMPass::initVariables(Module &M) {
     }
 
   } else if (TrackMode) {
-    Type *TraceCmpTtArgs[7] = {Int32Ty, Int32Ty, Int32Ty, Int32Ty,
-                               Int64Ty, Int64Ty, Int32Ty};
+    Type *TraceCmpTtArgs[8] = {Int32Ty, Int32Ty, Int32Ty, Int32Ty,
+                               Int64Ty, Int64Ty, Int32Ty, Int32Ty};
     TraceCmpTtTy = FunctionType::get(VoidTy, TraceCmpTtArgs, false);
     TraceCmpTT = M.getOrInsertFunction("__angora_trace_cmp_tt", TraceCmpTtTy);
     if (Function *F = dyn_cast<Function>(TraceCmpTT)) {
@@ -295,8 +296,8 @@ void AngoraLLVMPass::initVariables(Module &M) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
 
-    Type *TraceSwTtArgs[6] = {Int32Ty, Int32Ty, Int32Ty,
-                              Int64Ty, Int32Ty, Int64PtrTy};
+    Type *TraceSwTtArgs[7] = {Int32Ty, Int32Ty, Int32Ty,
+                              Int64Ty, Int32Ty, Int64PtrTy, Int32Ty};
     TraceSwTtTy = FunctionType::get(VoidTy, TraceSwTtArgs, false);
     TraceSwTT = M.getOrInsertFunction("__angora_trace_switch_tt", TraceSwTtTy);
     if (Function *F = dyn_cast<Function>(TraceSwTT)) {
@@ -304,7 +305,7 @@ void AngoraLLVMPass::initVariables(Module &M) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
 
-    Type *TraceFnTtArgs[5] = {Int32Ty, Int32Ty, Int32Ty, Int8PtrTy, Int8PtrTy};
+    Type *TraceFnTtArgs[6] = {Int32Ty, Int32Ty, Int32Ty, Int8PtrTy, Int8PtrTy, Int32Ty};
     TraceFnTtTy = FunctionType::get(VoidTy, TraceFnTtArgs, false);
     TraceFnTT = M.getOrInsertFunction("__angora_trace_fn_tt", TraceFnTtTy);
     if (Function *F = dyn_cast<Function>(TraceFnTT)) {
@@ -312,7 +313,7 @@ void AngoraLLVMPass::initVariables(Module &M) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadOnly);
     }
 
-    Type *TraceExploitTtArgs[5] = {Int32Ty, Int32Ty, Int32Ty, Int32Ty, Int64Ty};
+    Type *TraceExploitTtArgs[6] = {Int32Ty, Int32Ty, Int32Ty, Int32Ty, Int64Ty, Int32Ty};
     TraceExploitTtTy = FunctionType::get(VoidTy, TraceExploitTtArgs, false);
     TraceExploitTT = M.getOrInsertFunction("__angora_trace_exploit_val_tt",
                                            TraceExploitTtTy);
@@ -488,10 +489,10 @@ void AngoraLLVMPass::addFnWrap(Function &F) {
   }
 }
 
-void AngoraLLVMPass::processCall(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::processCall(Instruction *Inst) {
   
-  visitCompareFunc(Inst, cmp_list);
-  visitExploitation(Inst, cmp_list);
+  visitCompareFunc(Inst);
+  visitExploitation(Inst);
 
   //  if (ABIList.isIn(*Callee, "uninstrumented"))
   //  return;
@@ -502,7 +503,7 @@ void AngoraLLVMPass::processCall(Instruction *Inst, std::vector<u32> &cmp_list) 
   }
 }
 
-void AngoraLLVMPass::visitCallInst(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitCallInst(Instruction *Inst) {
 
   CallInst *Caller = dyn_cast<CallInst>(Inst);
   Function *Callee = Caller->getCalledFunction();
@@ -519,10 +520,10 @@ void AngoraLLVMPass::visitCallInst(Instruction *Inst, std::vector<u32> &cmp_list
     return;
   }
 
-  processCall(Inst, cmp_list);
+  processCall(Inst);
 };
 
-void AngoraLLVMPass::visitInvokeInst(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitInvokeInst(Instruction *Inst) {
 
   InvokeInst *Caller = dyn_cast<InvokeInst>(Inst);
   Function *Callee = Caller->getCalledFunction();
@@ -532,17 +533,16 @@ void AngoraLLVMPass::visitInvokeInst(Instruction *Inst, std::vector<u32> &cmp_li
     return;
   }
 
-  processCall(Inst, cmp_list);
+  processCall(Inst);
 }
 
-void AngoraLLVMPass::visitCompareFunc(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitCompareFunc(Instruction *Inst) {
   // configuration file: custom/exploitation_list.txt  fun:xx=cmpfn
 
   if (!isa<CallInst>(Inst) || !ExploitList.isIn(*Inst, CompareFuncCat)) {
     return;
   }
   u32 iid = getInstructionId(Inst);
-  cmp_list.push_back(iid);
   ConstantInt *Cid = ConstantInt::get(Int32Ty, iid);
 
   if (!TrackMode)
@@ -568,8 +568,9 @@ void AngoraLLVMPass::visitCompareFunc(Instruction *Inst, std::vector<u32> &cmp_l
   IRBuilder<> IRB(Inst);
   LoadInst *CurCtx = IRB.CreateLoad(AngoraContext);
   setInsNonSan(CurCtx);
+  ConstantInt *Fid = ConstantInt::get(Int32Ty, CurFuncId);
   CallInst *ProxyCall =
-      IRB.CreateCall(TraceFnTT, {Cid, CurCtx, ArgSize, OpArg[0], OpArg[1]});
+      IRB.CreateCall(TraceFnTT, {Cid, CurCtx, ArgSize, OpArg[0], OpArg[1], Fid});
   setInsNonSan(ProxyCall);
 }
 
@@ -664,9 +665,10 @@ void AngoraLLVMPass::processCmp(Instruction *Cond, Constant *Cid,
     OpArg[1] = castArgType(IRB, OpArg[1]);
     LoadInst *CurCtx = IRB.CreateLoad(AngoraContext);
     setInsNonSan(CurCtx);
+    ConstantInt *Fid = ConstantInt::get(Int32Ty, CurFuncId);
     CallInst *ProxyCall =
         IRB.CreateCall(TraceCmpTT, {Cid, CurCtx, SizeArg, TypeArg, OpArg[0],
-                                    OpArg[1], CondExt});
+                                    OpArg[1], CondExt, Fid});
     setInsNonSan(ProxyCall);
   }
 }
@@ -706,26 +708,26 @@ void AngoraLLVMPass::processBoolCmp(Value *Cond, Constant *Cid,
     setValueNonSan(OpArg[0]);
     LoadInst *CurCtx = IRB.CreateLoad(AngoraContext);
     setInsNonSan(CurCtx);
+    ConstantInt *Fid = ConstantInt::get(Int32Ty, CurFuncId);
     CallInst *ProxyCall =
         IRB.CreateCall(TraceCmpTT, {Cid, CurCtx, SizeArg, TypeArg, OpArg[0],
-                                    OpArg[1], CondExt});
+                                    OpArg[1], CondExt, Fid});
     setInsNonSan(ProxyCall);
   }
 }
 
-void AngoraLLVMPass::visitCmpInst(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitCmpInst(Instruction *Inst) {
   Instruction *InsertPoint = Inst->getNextNode();
   if (!InsertPoint || isa<ConstantInt>(Inst)){
     errs() << "can't get cmp insert\n";
     return;
   }
   u32 iid = getInstructionId(Inst);
-  cmp_list.push_back(iid);
   Constant *Cid = ConstantInt::get(Int32Ty, iid);
   processCmp(Inst, Cid, InsertPoint);
 }
 
-void AngoraLLVMPass::visitBranchInst(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitBranchInst(Instruction *Inst) {
   BranchInst *Br = dyn_cast<BranchInst>(Inst);
   if (Br->isConditional()) {
     Value *Cond = Br->getCondition();
@@ -734,14 +736,13 @@ void AngoraLLVMPass::visitBranchInst(Instruction *Inst, std::vector<u32> &cmp_li
         // From  and, or, call, phi ....
         u32 iid = getInstructionId(Inst);
         Constant *Cid = ConstantInt::get(Int32Ty, iid);
-        cmp_list.push_back(iid);
         processBoolCmp(Cond, Cid, Inst);
       }
     }
   }
 }
 
-void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst) {
 
   SwitchInst *Sw = dyn_cast<SwitchInst>(Inst);
   Value *Cond = Sw->getCondition();
@@ -756,7 +757,6 @@ void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst, std::vector<u
     return;
 
   u32 iid = getInstructionId(Inst);
-  cmp_list.push_back(iid);
   Constant *Cid = ConstantInt::get(Int32Ty, iid);
   IRBuilder<> IRB(Sw);
 
@@ -797,13 +797,14 @@ void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst, std::vector<u
     setValueNonSan(CondExt);
     LoadInst *CurCtx = IRB.CreateLoad(AngoraContext);
     setInsNonSan(CurCtx);
+    ConstantInt *Fid = ConstantInt::get(Int32Ty, CurFuncId);
     CallInst *ProxyCall = IRB.CreateCall(
-        TraceSwTT, {Cid, CurCtx, SizeArg, CondExt, SwNum, ArrPtr});
+        TraceSwTT, {Cid, CurCtx, SizeArg, CondExt, SwNum, ArrPtr, Fid});
     setInsNonSan(ProxyCall);
   }
 }
 
-void AngoraLLVMPass::visitExploitation(Instruction *Inst, std::vector<u32> &cmp_list) {
+void AngoraLLVMPass::visitExploitation(Instruction *Inst) {
   // For each instruction and called function.
   bool exploit_all = ExploitList.isIn(*Inst, ExploitCategoryAll);
   IRBuilder<> IRB(Inst);
@@ -829,7 +830,6 @@ void AngoraLLVMPass::visitExploitation(Instruction *Inst, std::vector<u32> &cmp_
       if (ParamType->isIntegerTy() || ParamType->isPointerTy()) {
         if (!isa<ConstantInt>(ParamVal)) {
           u32 iid = getInstructionId(Inst);
-          cmp_list.push_back(iid);
           ConstantInt *Cid = ConstantInt::get(Int32Ty, iid);
           int size = ParamVal->getType()->getScalarSizeInBits() / 8;
           if (ParamType->isPointerTy()) {
@@ -842,8 +842,9 @@ void AngoraLLVMPass::visitExploitation(Instruction *Inst, std::vector<u32> &cmp_
           if (TrackMode) {
             LoadInst *CurCtx = IRB.CreateLoad(AngoraContext);
             setInsNonSan(CurCtx);
+            ConstantInt *Fid = ConstantInt::get(Int32Ty, CurFuncId);
             CallInst *ProxyCall = IRB.CreateCall(
-                TraceExploitTT, {Cid, CurCtx, SizeArg, TypeArg, ParamVal});
+                TraceExploitTT, {Cid, CurCtx, SizeArg, TypeArg, ParamVal, Fid});
             setInsNonSan(ProxyCall);
           }
         }
@@ -869,16 +870,14 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
   if (DFSanMode)
     return true;
 
-  std::ofstream func;
-  if (FastMode){
-    func.open("tmp_llvm.txt", std::ofstream::out | std::ofstream::app);
-  }
+  CurFuncId = 0;
+
   for (auto &F : M) {
     if (F.isDeclaration())
       continue;
 
+
     addFnWrap(F);
-    std::vector<u32> cmp_list;
     std::vector<BasicBlock *> bb_list;
     for (auto bb = F.begin(); bb != F.end(); bb++)
       bb_list.push_back(&(*bb));
@@ -900,47 +899,29 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
           countEdge(M, *BB); //execute only in fast mode
         }
         if (isa<CallInst>(Inst)) {
-          visitCallInst(Inst, cmp_list);
+          visitCallInst(Inst);
         } else if (isa<InvokeInst>(Inst)) {
-          visitInvokeInst(Inst, cmp_list);
+          visitInvokeInst(Inst);
         } else if (isa<BranchInst>(Inst)) {
-          visitBranchInst(Inst, cmp_list);
+          visitBranchInst(Inst);
         } else if (isa<SwitchInst>(Inst)) {
-          visitSwitchInst(M, Inst, cmp_list);
+          visitSwitchInst(M, Inst);
         } else if (isa<CmpInst>(Inst)) {
-          visitCmpInst(Inst, cmp_list);
+          visitCmpInst(Inst);
         } else {
-          visitExploitation(Inst, cmp_list);
+          visitExploitation(Inst);
         }
       }
     }
-    if ((cmp_list.size() >= FUNC_CMP_SIZE) && FastMode){
-      func << F.getName().str() << "," << cmp_list.size() << "\n";
-      for (auto i = cmp_list.begin(); i != cmp_list.end(); i++){
-        func << *i << ",";
-      }
-      func << "\n";
-    }
-  }
-  if (FastMode) {
-   func.close();
-   std::ifstream func2("tmp_llvm.txt");
-   std::string readline;
-   int num_func = 0;
-   while(std::getline(func2, readline)) {
-     num_func ++;
-   }
-   func2.close();
-   num_func = num_func / 2;
 
-   func2.open("tmp_llvm.txt");
-   std::ofstream func3("FuncInfo.txt");
-   func3 << num_func << "\n";
-   while( std::getline(func2, readline)) {
-     func3 << readline << "\n";
-   }
-   func2.close();
-   func3.close();
+    CurFuncId ++;
+  }
+  
+  std::ofstream func;
+  if (FastMode) {
+    func.open("angora_func_id", std::ofstream::out | std::ofstream::app);
+    func << CurFuncId;
+    func.close();
   }
 
   if (is_bc)

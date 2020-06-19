@@ -47,13 +47,11 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 //Cheong
 pub const FUNC_REL_HIGH_THRESHOLD : f32 = 0.7;
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 12;
 
 //MUTATE TC SELECTION assume either one of them or none of them
-pub const TC_SEL_FUNC_REL : bool = false;
+pub const TC_SEL_FUNC_REL : bool = true;
 pub const TC_SEL_RANDOM : bool = false;
-
-pub const FUNC_REL_TC_SELECT : bool = false;
 
 //BYTE EXTENSION assume either one of them or none of them
 pub const BYTE_EXT_FUNC_REL : bool = true;

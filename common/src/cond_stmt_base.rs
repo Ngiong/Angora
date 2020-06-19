@@ -8,6 +8,7 @@ pub struct CondStmtBase {
     pub context: u32,
     pub order: u32,
     pub belong: u32,
+    pub belong_func : u32,
 
     pub condition: u32, // 0 false, 1 true, 2 done
     pub level: u32,

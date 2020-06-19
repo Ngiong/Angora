@@ -8,17 +8,18 @@ use crate::{
 use angora_common::{config, defs};
 
 use std::{
+    ops::{Deref, DerefMut},
     fs,
+    fs::OpenOptions,
     collections::{HashMap, HashSet},
     path::Path,
     process::{Command, Stdio},
-    fs::{OpenOptions}, 
-    io::Write,
     sync::{
         atomic::{compiler_fence, Ordering},
         Arc, RwLock,
     },
     time,
+    io::Write,
 };
 use wait_timeout::ChildExt;
 
@@ -36,12 +37,9 @@ pub struct Executor {
     pub has_new_path: bool,
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
-    pub func_rel_map : Vec<Vec<u32>>,
-    pub func_cmp_map : Vec<Vec<u32>>,
-    pub func_id_map : Vec<String>,
+    pub func_rel_map : Box<[Box<[usize]>]>,
+    pub func_num : usize,
     pub rel_rec_set : HashSet<usize>,
-    pub func_uniq_call_set : HashSet<Vec<u32>>,
-    pub func_executed : Vec<usize>,
     pub cid : usize,
     pub taint_files : HashSet<u32>,
 }
@@ -52,9 +50,7 @@ impl Executor {
         global_branches: Arc<branches::GlobalBranches>,
         depot: Arc<depot::Depot>,
         global_stats: Arc<RwLock<stats::ChartStats>>,
-        func_rel_map : Vec<Vec<u32>>,
-        func_cmp_map : Vec<Vec<u32>>,
-        func_id_map : Vec<String>,
+        func_num : usize,
         cid : usize,
     ) -> Self {
         // ** Share Memory **
@@ -97,6 +93,8 @@ impl Executor {
             cmd.time_limit,
             cmd.mem_limit,
         ));
+        
+        let func_rel_map = vec![vec![0; func_num].into_boxed_slice(); func_num].into_boxed_slice();
 
         Self {
             cmd,
@@ -113,11 +111,8 @@ impl Executor {
             global_stats,
             local_stats: Default::default(),
             func_rel_map : func_rel_map,
-            func_cmp_map : func_cmp_map,
-            func_id_map : func_id_map,
+            func_num : func_num,
             rel_rec_set : HashSet::new(),
-            func_uniq_call_set : HashSet::new(),
-            func_executed : vec![],
             cid : cid,
             taint_files : HashSet::new(),
         }
@@ -280,8 +275,8 @@ impl Executor {
                 if !crash_or_tmout {
                     let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
-                        self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &self.func_cmp_map, &mut self.taint_files);
-                        if !self.rel_rec_set.contains(&id) && (self.func_rel_map.len() != 0) {
+                        self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &mut self.taint_files);
+                        if !self.rel_rec_set.contains(&id) && (self.func_num != 0) {
                           self.get_func_and_record(cond_stmts);
                           self.rel_rec_set.insert(id);
                         }
@@ -289,7 +284,7 @@ impl Executor {
                             self.depot
                                 .add_entries(vec![cond_stmt::CondStmt::get_afl_cond(
                                     id, speed, edge_num,
-                                )], &self.func_rel_map, &self.func_cmp_map, &mut self.taint_files);
+                                )], &self.func_rel_map, &mut self.taint_files);
                         }
                     }
                 }
@@ -482,64 +477,13 @@ impl Executor {
     
     pub fn get_func_and_record(&mut self, cond_list : Vec<cond_stmt::CondStmt>) {
       //the set of all executed function
-      let mut func_set : HashSet<usize> = HashSet::new();
+      let mut func_set = HashSet::new();
       for c in cond_list{
-        for (funcid, cmplist) in self.func_cmp_map.iter().enumerate(){
-          if cmplist.contains(&c.base.cmpid) {
-              func_set.insert(funcid as usize);
-          }
-        }
+        func_set.insert(c.base.belong_func as usize);
       }
-
-      //Hashing 
-      if config::FUNC_REL_TC_SELECT {
-        let func_orig_set = func_set.clone();
-        let mut hashvec : Vec<u32> = vec![0];
-        let mut tmpidx = 0;
-        let mut hashidx = 0;
-        for func_id in self.func_executed.iter() {
-          if func_set.contains(func_id) {
-             if let Some (helem) = hashvec.get_mut(hashidx) {
-               *helem = *helem | (1 << tmpidx);
-             } else {panic!();}
-            if !func_set.remove(func_id) {
-              panic!();
-            }
-          }
-          tmpidx += 1;
-          if tmpidx >= 32 {
-            tmpidx = 0;
-            hashidx += 1;
-            hashvec.push(0);
-          }
-        }
-        //The rest of func_set are functions which are executed first time.
-        for func in &func_set {
-          self.func_executed.push(*func);
-          if let Some (helem) = hashvec.get_mut(hashidx) {
-            *helem = *helem + ( 1 << tmpidx);
-          } else { panic!();} 
-          tmpidx += 1;
-          if tmpidx >= 32 {
-            tmpidx = 0;
-            hashidx += 1;
-            hashvec.push(0);
-          }
-        }
-       
-        if ! self.func_uniq_call_set.contains(&hashvec) {
-          for f1 in &func_orig_set{
-            for f2 in &func_orig_set{
-              self.func_rel_map[*f1][*f2] += 1;
-            }
-          }
-          self.func_uniq_call_set.insert(hashvec);
-        }
-      } else {
-        for f1 in &func_set{
-          for f2 in &func_set{
-            self.func_rel_map[*f1][*f2] += 1;
-          }
+      for f1 in &func_set{
+        for f2 in &func_set{
+           self.func_rel_map.deref_mut()[*f1].deref_mut()[*f2] += 1;
         }
       }
     }
@@ -558,31 +502,31 @@ impl Executor {
 }
 
 impl Drop for Executor {
-  fn drop(&mut self) {
-    if self.func_rel_map.len() == 0 || self.cid == 255 { return;}
-    let time_path = self.cmd.tmp_dir.as_path().parent().unwrap().join(format!("func_time_{}", self.cid));
-    let mut time_file = OpenOptions::new().write(true).create(true)
+    fn drop(&mut self) {
+        if self.cid != 255 && self.func_num != 0 {
+            let time_path = self.cmd.tmp_dir.as_path().parent().unwrap().join(format!("func_time_{}", self.cid));
+            let mut time_file = OpenOptions::new().write(true).create(true)
                     .open(time_path).expect("can't open time_file");
-    if let Err(_) = writeln!(time_file, "Func rel overhead (in millis) : {}", self.global_stats.read().unwrap().func_time.0.as_millis()) {eprintln!("can't write to func file")};
-    info!("dump func rel ..");
-    let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap().join("rels");
-    if let Err(_) = fs::create_dir(&rel_path) {()}
-    let mut rel_all_file = OpenOptions::new().write(true).create(true)
+            writeln!(time_file, "Func rel overhead (in millis) : {}",
+                self.global_stats.read().unwrap().func_time.0.as_millis()).unwrap();
+            info!("dump func rel ..");
+            let rel_path = self.cmd.tmp_dir.as_path().parent().unwrap().join("rels");
+            fs::create_dir(&rel_path).unwrap_or_else(|_| ());
+            let mut rel_all_file = OpenOptions::new().write(true).create(true)
                     .open(rel_path.join(format!("rel_all_{}.csv",self.cid))).expect("can't open rel_all_file");
-
-    if let Err(_) = writeln!(rel_all_file, "choose : {}, # of selected TC : {}",
-                             config::FUNC_REL_TC_SELECT, self.func_uniq_call_set.len()) {eprintln!("can't write ")};
-    if let Err(_) = write!(rel_all_file, ",") {eprintln!("can't write in rel_all.csv");}
-    for func_id in &self.func_id_map {
-      if let Err(_) = write!(rel_all_file, "{},", func_id) {eprintln!("can't write 1")}
+            
+            write!(rel_all_file, ",").unwrap();
+            for func_id in 0..self.func_num {
+                write!(rel_all_file, "{},", func_id).unwrap();
+            }
+            writeln!(rel_all_file, "").unwrap();
+            for (i, f1) in self.func_rel_map.iter().enumerate() {
+                write!(rel_all_file, "{},", i).unwrap();
+                for f2 in f1.deref() {
+                    write!(rel_all_file, "{},", f2).unwrap();
+                }
+                writeln!(rel_all_file, "").unwrap();
+            }
+        }
     }
-    if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
-    for (i, f1) in self.func_rel_map.iter().enumerate() {
-      if let Err(_) = write!(rel_all_file, "{},", self.func_id_map[i]) {eprintln!("can't write 1")}
-      for f2 in f1 {
-        if let Err(_) = write!(rel_all_file, "{},", f2) {eprintln!("can't write 1")}
-      }
-      if let Err(_) = writeln!(rel_all_file, "") {eprintln!("can't write 1")}
-    }
-  }
 }

@@ -32,7 +32,7 @@ pub fn fuzz_main(
     sync_afl: bool,
     enable_afl: bool,
     enable_exploitation: bool,
-    func_cmp_map : Option<&str>
+    num_of_func: Option<&str>
 ) {
     pretty_env_logger::init();
 
@@ -54,10 +54,10 @@ pub fn fuzz_main(
     let depot = Arc::new(depot::Depot::new(seeds_dir, &angora_out_dir)); //queue for main fuzz loop
     info!("{:?}", depot.dirs);
 
-    let (func_cmp_map, func_id_map) = get_func_maps (func_cmp_map); 
+    let func_num = get_func_num (num_of_func); 
 
     record_parameter(&angora_out_dir, &command_option, in_dir);
-    let stats = Arc::new(RwLock::new(stats::ChartStats::new(&track_target ,&out_dir, func_cmp_map.len() != 0)));
+    let stats = Arc::new(RwLock::new(stats::ChartStats::new(&track_target ,&out_dir, func_num != 0)));
     let global_branches = Arc::new(branches::GlobalBranches::new());  //To record global path coverage (edge cov?)
     let fuzzer_stats = create_stats_file_and_write_pid(&angora_out_dir);
     let running = Arc::new(AtomicBool::new(true)); //check whether the fuzzing is running
@@ -68,7 +68,7 @@ pub fn fuzz_main(
         global_branches.clone(),
         depot.clone(),
         stats.clone(),
-        vec![], vec![], vec![],
+        0,
         255
     );
 
@@ -92,8 +92,7 @@ pub fn fuzz_main(
         &global_branches,
         &depot,
         &stats,
-        &func_cmp_map, 
-        &func_id_map,
+        func_num,
     );
    
     let taints_dir = angora_out_dir.join(defs::TAINTS_DIR);
@@ -136,55 +135,10 @@ pub fn fuzz_main(
 }
 
 
-fn get_func_maps (s : Option<&str>) -> (Vec<Vec<u32>>, Vec<String>) {
-  if s == None {return (vec![], vec![])}
-  let mut ff = fs::File::open(s.unwrap()).expect("File not Found");
-  let mut conts = String::new();
-  ff.read_to_string(&mut conts).expect("Can't read file");
-  let mut func_cmp_map : Vec<Vec<u32>> = vec![];
-  let mut func_id_map : Vec<String> = vec![];
-  let mut cmplist : Vec<u32> = Vec::new();
-  let mut funcname = String::new();
-  let mut cmpid = String::new();
-  let mut func_id = 0;
-  let mut stage = -1; // 0 for funcname, 1 for tmp, 2 for cmp
-  for c in conts.chars() {
-    match &stage {
-      -1 => { if c == '\n' {
-                let num_func = funcname.parse::<usize>().unwrap();
-                func_cmp_map = vec![vec![]; num_func];
-                func_id_map = vec![String::new(); num_func];
-                funcname = String::new();
-                stage = 0;
-              } else {
-                funcname.push(c);
-              }
-            },
-      0 => { if c == ',' {
-               stage = 1;
-             } else {
-               funcname.push(c);
-             }
-           },
-      1 => { if c == '\n' { stage = 2; } },
-      2 => { if c == '\n' {
-               stage = 0;
-               func_cmp_map[func_id] = cmplist;
-               func_id_map[func_id] = funcname;
-               func_id += 1;
-               funcname = String::new();
-               cmplist = Vec::new();
-            } else if c == ',' {
-               cmplist.push(cmpid.parse::<u32>().unwrap());
-               cmpid = String::new();
-            } else {
-               cmpid.push(c);
-            }
-           },
-       _ => {panic!();},
-    };
-  }
-  (func_cmp_map, func_id_map)
+fn get_func_num (s : Option<&str>) -> usize {
+  if s == None {return 0}
+  let func_num = fs::read_to_string(s.unwrap()).expect("Can not read func info fild");
+  func_num.parse::<usize>().unwrap_or(0)
 }
 
 
@@ -239,9 +193,9 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     Ok(a) => a,
     Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
   };
-  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, func_rel cal tc selection : {}, tc selection with func_rel : {}, tc selection random : {}, byte_ext_func_rel : {}, byte_ext_random : {} ",
+  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, tc selection with func_rel : {}, tc selection random : {}, byte_ext_func_rel : {}, byte_ext_random : {} ",
                out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0,
-               config::FUZZ_TIME_OUT / 3600, config::FUNC_REL_TC_SELECT, config::TC_SEL_FUNC_REL, config::TC_SEL_RANDOM, config::BYTE_EXT_FUNC_REL, config::BYTE_EXT_RANDOM)
+               config::FUZZ_TIME_OUT / 3600, config::TC_SEL_FUNC_REL, config::TC_SEL_RANDOM, config::BYTE_EXT_FUNC_REL, config::BYTE_EXT_RANDOM)
          .expect("Could not write to param file");
   writeln!(buff, "").expect("Could not write");
   for s in &command.main.1{
@@ -275,8 +229,7 @@ fn init_cpus_and_run_fuzzing_threads(
     global_branches: &Arc<branches::GlobalBranches>,
     depot: &Arc<depot::Depot>,
     stats: &Arc<RwLock<stats::ChartStats>>,
-    func_cmp_map : &Vec<Vec<u32>>,
-    func_id_map : &Vec<String>,
+    func_num : usize,
 ) -> (Vec<thread::JoinHandle<()>>, Arc<AtomicUsize>) {
     let child_count = Arc::new(AtomicUsize::new(0));
     let mut handlers = vec![];
@@ -295,15 +248,13 @@ fn init_cpus_and_run_fuzzing_threads(
         let d = depot.clone();
         let b = global_branches.clone();
         let s = stats.clone();
-        let fcmp = func_cmp_map.clone();
-        let fid = func_id_map.clone();
         let cid = if bind_cpus { free_cpus[thread_id] } else { 0 };
         let handler = thread::spawn(move || {
             c.fetch_add(1, Ordering::SeqCst);
             if bind_cpus {
                 bind_cpu::bind_thread_to_cpu_core(cid);
             }
-            fuzz_loop::fuzz_loop(r, cmd, d, b, s, fcmp, fid, cid);
+            fuzz_loop::fuzz_loop(r, cmd, d, b, s, func_num, cid);
         });
         handlers.push(handler);
     }
