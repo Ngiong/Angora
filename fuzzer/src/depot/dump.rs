@@ -27,14 +27,14 @@ impl Drop for Depot {
 
         for (cond, p) in q.iter() {
             if !cond.base.is_afl() {
-                let mut offsets = vec![];
-                for off in &cond.offsets {
-                    offsets.push(format!("{}-{}", off.begin, off.end));
-                }
+                //let mut offsets = vec![];
+                //for off in &cond.offsets {
+               //     offsets.push(format!("{}-{}", off.begin, off.end));
+                //}
 
                 writeln!(
                     log_q,
-                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}",
+                    "{}, {}, {}, {}, {}, {}, {}, {:x}, {:x}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}",
                     cond.base.cmpid,
                     cond.base.context,
                     cond.base.order,
@@ -45,7 +45,7 @@ impl Drop for Depot {
                     cond.base.arg1,
                     cond.base.arg2,
                     cond.is_desirable,
-                    offsets.join("&"),
+                    //offsets.join("&"),
                     cond.state,
                     cond.get_offset_len(),
                     cond.get_fuzz_type(),

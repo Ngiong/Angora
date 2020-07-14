@@ -25,19 +25,24 @@ pub struct Depot {
     pub dirs: DepotDir,
 }
 
-fn get_func_rel_score(funcid : u32, exec_func_set : &HashSet<u32>, func_rel_map : &Box<[Box<[usize]>]>) -> f32 {
+unsafe fn get_func_rel_score(funcid : u32, exec_func_set : &HashSet<u32>, func_rel_map : *mut usize, func_num : usize) -> f32 {
   if config::TC_SEL_RANDOM {
     let mut rng = thread_rng(); 
     let res : f32 = rng.gen_range(0.0, 1.0);
     return res;
+  } else if func_num == 0 {
+      return 1.0;
   }
+
   let mut count = 0;
-  let func_list = get_rel_func_list(funcid as usize, func_rel_map);
-  for f in func_list {
-    if exec_func_set.contains(&(f as u32)) {
-      count += 1;
-    }
+  let func_list = get_rel_func_list(funcid as usize, func_rel_map, func_num);
+  
+  for f in exec_func_set {
+      if func_list[*f as usize/ 8] & (1 << (*f % 8)) != 0 {
+          count += 1;
+      }
   }
+  
   (count as f32) / (exec_func_set.len() as f32) 
 }
 
@@ -132,7 +137,7 @@ impl Depot {
             })
     }
 
-    pub fn add_entries(&self, conds: Vec<CondStmt>, func_rel_map : &Box<[Box<[usize]>]>, taint_files : &mut HashSet<u32>) {
+    pub unsafe fn add_entries(&self, conds: &Vec<CondStmt>, func_rel_map : *mut usize, func_num : usize, taint_files : &mut HashSet<u32>) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -142,14 +147,14 @@ impl Depot {
         };
 
         let mut exec_func_set = HashSet::new();
-        for c in &conds {
+        for c in conds {
           exec_func_set.insert(c.base.belong_func);
         }
         let mut inserted_all = false;
         let belong = conds[0].base.belong;
-        for mut cond in conds {
+        for cond in conds {
             if cond.is_desirable {
-                if let Some(v) = q.get_mut(&cond) {
+                if let Some(v) = q.get_mut(cond) {
                   //the COND aleady exists in the queue
                     if !v.0.is_done() {
                         // If existed one and our new one has two different conditions,
@@ -157,14 +162,14 @@ impl Depot {
                         // different condition -> different then/else condition -> explored!
                         if v.0.base.condition != cond.base.condition {
                             v.0.mark_as_done();
-                            q.change_priority(&cond, QPriority::done());
+                            q.change_priority(cond, QPriority::done());
                         } else {
                             // Existed, but the new one are better
                             // If the cond is faster than the older one,
                             // we prefer the faster one.
                             let mut new_fr_score = v.0.func_rel_score.clone();
                             if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
-                              let func_rel_score = get_func_rel_score(cond.base.belong_func, &exec_func_set, func_rel_map);
+                              let func_rel_score = get_func_rel_score(cond.base.belong_func, &exec_func_set, func_rel_map, func_num);
                               let mut inserted = false;
                               for (i, fr) in v.0.func_rel_score.iter().enumerate() {
                                 if fr.0 == std::f32::NAN || fr.0 < func_rel_score {
@@ -180,6 +185,7 @@ impl Depot {
                               } else if new_fr_score.len() > config::STMT_BELONGS_LIMIT { new_fr_score.pop();};
                             };
                             if v.0.speed > cond.speed {
+                                let mut cond = cond.clone();
                                 cond.func_rel_score = new_fr_score;
                                 cond.executed_belongs = v.0.executed_belongs.clone();
                                 mem::swap(v.0, &mut cond);
@@ -192,8 +198,9 @@ impl Depot {
                     }
                 } else { //no same branch
                     let priority = QPriority::init(cond.base.op);
+                    let mut cond = cond.clone();
                     if config::TC_SEL_FUNC_REL || config::TC_SEL_RANDOM {
-                      cond.func_rel_score.push((get_func_rel_score(cond.base.belong_func, &exec_func_set, func_rel_map)
+                      cond.func_rel_score.push((get_func_rel_score(cond.base.belong_func, &exec_func_set, func_rel_map, func_num)
                                                 ,belong));
                       inserted_all = true;
                     };

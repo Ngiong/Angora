@@ -8,9 +8,10 @@ use crate::{
 use angora_common::{config, defs};
 
 use std::{
-    ops::{Deref, DerefMut},
+    //ops::{Deref, DerefMut},
     fs,
-    fs::OpenOptions,
+    //fs::OpenOptions,
+    //io::Write,
     collections::{HashMap, HashSet},
     path::Path,
     process::{Command, Stdio},
@@ -18,8 +19,10 @@ use std::{
         atomic::{compiler_fence, Ordering},
         Arc, RwLock,
     },
+    mem::size_of,
+    alloc::{alloc, dealloc, Layout},
+    ptr::null_mut,
     time,
-    io::Write,
 };
 use wait_timeout::ChildExt;
 
@@ -37,7 +40,7 @@ pub struct Executor {
     pub has_new_path: bool,
     pub global_stats: Arc<RwLock<stats::ChartStats>>,
     pub local_stats: stats::LocalStats,
-    pub func_rel_map : Box<[Box<[usize]>]>,
+    pub func_rel_map : *mut usize,
     pub func_num : usize,
     pub rel_rec_set : HashSet<usize>,
     pub cid : usize,
@@ -94,7 +97,17 @@ impl Executor {
             cmd.mem_limit,
         ));
         
-        let func_rel_map = vec![vec![0; func_num].into_boxed_slice(); func_num].into_boxed_slice();
+
+
+        //let func_rel_map = vec![vec![0; func_num].into_boxed_slice(); func_num].into_boxed_slice();
+
+        unsafe {
+            let func_rel_map = if func_num == 0 {
+                null_mut()
+            } else {
+                let layout = Layout::from_size_align(size_of::<usize>() * func_num * func_num, size_of::<usize>()).unwrap();
+                alloc(layout) as *mut usize
+            };
 
         Self {
             cmd,
@@ -115,6 +128,7 @@ impl Executor {
             rel_rec_set : HashSet::new(),
             cid : cid,
             taint_files : HashSet::new(),
+        }
         }
     }
 
@@ -248,7 +262,7 @@ impl Executor {
         // new edge: one byte in bitmap
         let (has_new_path, has_new_edge, edge_num) = self.branches.has_new(status);
 
-        // measure function block covearge
+        // measure function block coverzage
         // Vec<usize>
         if has_new_path {
             self.has_new_path = true;
@@ -275,16 +289,19 @@ impl Executor {
                 if !crash_or_tmout {
                     let cond_stmts = self.track(id, buf, speed);
                     if cond_stmts.len() > 0 {
-                        self.depot.add_entries(cond_stmts.clone(), &self.func_rel_map, &mut self.taint_files);
+                        unsafe {
+                            self.depot.add_entries(&cond_stmts, self.func_rel_map, self.func_num, &mut self.taint_files);
+                        }
                         if !self.rel_rec_set.contains(&id) && (self.func_num != 0) {
                           self.get_func_and_record(cond_stmts);
                           self.rel_rec_set.insert(id);
                         }
                         if self.cmd.enable_afl {
-                            self.depot
-                                .add_entries(vec![cond_stmt::CondStmt::get_afl_cond(
-                                    id, speed, edge_num,
-                                )], &self.func_rel_map, &mut self.taint_files);
+                            let tmp = vec![cond_stmt::CondStmt::get_afl_cond(id, speed, edge_num)];
+                            unsafe {
+                                self.depot
+                                .add_entries(&tmp, self.func_rel_map, self.func_num, &mut self.taint_files);
+                            }
                         }
                     }
                 }
@@ -477,13 +494,18 @@ impl Executor {
     
     pub fn get_func_and_record(&mut self, cond_list : Vec<cond_stmt::CondStmt>) {
       //the set of all executed function
-      let mut func_set = HashSet::new();
+      let mut func_set : HashSet<usize> = HashSet::new();
       for c in cond_list{
         func_set.insert(c.base.belong_func as usize);
       }
       for f1 in &func_set{
         for f2 in &func_set{
-           self.func_rel_map.deref_mut()[*f1].deref_mut()[*f2] += 1;
+           let index = f1 * self.func_num + f2;
+           unsafe {
+               let indexed_ptr = self.func_rel_map.offset(index as isize);
+               *indexed_ptr += 1;
+           }
+           //self.func_rel_map.deref_mut()[*f1].deref_mut()[*f2] += 1;
         }
       }
     }
@@ -504,6 +526,7 @@ impl Executor {
 impl Drop for Executor {
     fn drop(&mut self) {
         if self.cid != 255 && self.func_num != 0 {
+            /*
             let time_path = self.cmd.tmp_dir.as_path().parent().unwrap().join(format!("func_time_{}", self.cid));
             let mut time_file = OpenOptions::new().write(true).create(true)
                     .open(time_path).expect("can't open time_file");
@@ -526,6 +549,12 @@ impl Drop for Executor {
                     write!(rel_all_file, "{},", f2).unwrap();
                 }
                 writeln!(rel_all_file, "").unwrap();
+            }
+            */
+
+            unsafe {
+                let layout = Layout::from_size_align(size_of::<usize>() * self.func_num * self.func_num, size_of::<usize>()).unwrap();
+                dealloc(self.func_rel_map as *mut u8, layout);
             }
         }
     }

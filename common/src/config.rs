@@ -47,7 +47,8 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 //Cheong
 pub const FUNC_REL_HIGH_THRESHOLD : f32 = 0.7;
-pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 12;
+pub const FUZZ_TIME_OUT : u32 = 60 * 24;
+
 
 //MUTATE TC SELECTION assume either one of them or none of them
 pub const TC_SEL_FUNC_REL : bool = true;

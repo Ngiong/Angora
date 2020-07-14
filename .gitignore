@@ -40,3 +40,4 @@ llvm_mode/build/
 /0920/
 inputs_vuzzer/
 nohup*
+angora_vs.proj.code-workspace
