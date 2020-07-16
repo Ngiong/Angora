@@ -86,6 +86,9 @@ impl Executor {
         );
 
         let fd = pipe_fd::PipeFd::new(&cmd.out_file);
+        
+        //TODO : forksrv for multi input options
+        /*
         let forksrv = Some(forksrv::Forksrv::new(
             &cmd.forksrv_socket_path,
             &cmd.main,
@@ -96,8 +99,8 @@ impl Executor {
             cmd.time_limit,
             cmd.mem_limit,
         ));
-        
-
+        */
+        let forksrv = None;
 
         //let func_rel_map = vec![vec![0; func_num].into_boxed_slice(); func_num].into_boxed_slice();
 
@@ -139,7 +142,8 @@ impl Executor {
         }
         let fs = forksrv::Forksrv::new(
             &self.cmd.forksrv_socket_path,
-            &self.cmd.main,
+            &self.cmd.main_bin,
+            &self.cmd.main_args[0],
             &self.envs,
             self.fd.as_raw_fd(),
             self.cmd.is_stdin,
@@ -211,7 +215,7 @@ impl Executor {
     ) -> (StatusType, u64) {
         self.run_init();
         self.t_conds.set(cond); //cond_stmt::ShmConds
-        let mut status = self.run_inner(buf);
+        let mut status = self.run_inner(buf, cond.input_option);
 
         let output = self.t_conds.get_cond_output();
         let mut explored = false;
@@ -222,7 +226,7 @@ impl Executor {
         skip |= self.check_invariable(output, cond);
         self.check_consistent(output, cond);
 
-        self.do_if_has_new(buf, status, explored, cond.base.cmpid, cond.base.belong);
+        self.do_if_has_new(buf, cond.input_option, status, explored, cond.base.cmpid, cond.base.belong);
         status = self.check_timeout(status, cond);
 
         if skip {
@@ -232,7 +236,7 @@ impl Executor {
         (status, output)
     }
 
-    fn try_unlimited_memory(&mut self, buf: &Vec<u8>, cmpid: u32, belong : u32) -> bool {
+    fn try_unlimited_memory(&mut self, buf: &Vec<u8>, input_option: usize, cmpid: u32, belong : u32) -> bool {
         let mut skip = false;
         self.branches.clear_trace();
         if self.cmd.is_stdin {
@@ -240,7 +244,7 @@ impl Executor {
         }
         compiler_fence(Ordering::SeqCst);
         let unmem_status =
-            self.run_target(&self.cmd.main, config::MEM_LIMIT_TRACK, self.cmd.time_limit);
+            self.run_target(&self.cmd.main_bin, &self.cmd.main_args[input_option], config::MEM_LIMIT_TRACK, self.cmd.time_limit);
         compiler_fence(Ordering::SeqCst);
 
         // find difference
@@ -258,7 +262,7 @@ impl Executor {
         skip
     }
 
-    fn do_if_has_new(&mut self, buf: &Vec<u8>, status: StatusType, _explored: bool, cmpid: u32, belong : u32) {
+    fn do_if_has_new(&mut self, buf: &Vec<u8>, input_option : usize, status: StatusType, _explored: bool, cmpid: u32, belong : u32) {
         // new edge: one byte in bitmap
         let (has_new_path, has_new_edge, edge_num) = self.branches.has_new(status);
 
@@ -285,12 +289,12 @@ impl Executor {
                     );
                     return;
                 }
-                let crash_or_tmout = self.try_unlimited_memory(buf, cmpid, belong);
+                let crash_or_tmout = self.try_unlimited_memory(buf,input_option, cmpid, belong);
                 if !crash_or_tmout {
-                    let cond_stmts = self.track(id, buf, speed);
+                    let cond_stmts = self.track(id, buf, input_option, speed);
                     if cond_stmts.len() > 0 {
                         unsafe {
-                            self.depot.add_entries(&cond_stmts, self.func_rel_map, self.func_num, &mut self.taint_files);
+                            self.depot.add_entries(&cond_stmts, self.func_rel_map, self.func_num, &mut self.taint_files, input_option);
                         }
                         if !self.rel_rec_set.contains(&id) && (self.func_num != 0) {
                           self.get_func_and_record(cond_stmts);
@@ -300,7 +304,7 @@ impl Executor {
                             let tmp = vec![cond_stmt::CondStmt::get_afl_cond(id, speed, edge_num)];
                             unsafe {
                                 self.depot
-                                .add_entries(&tmp, self.func_rel_map, self.func_num, &mut self.taint_files);
+                                .add_entries(&tmp, self.func_rel_map, self.func_num, &mut self.taint_files, input_option);
                             }
                         }
                     }
@@ -309,17 +313,17 @@ impl Executor {
         }
     }
 
-    pub fn run(&mut self, buf: &Vec<u8>, cond: &mut cond_stmt::CondStmt) -> StatusType {
+    pub fn run(&mut self, buf: &Vec<u8>, input_option : usize, cond: &mut cond_stmt::CondStmt) -> StatusType {
         self.run_init();
-        let status = self.run_inner(buf);
-        self.do_if_has_new(buf, status, false, 0, cond.base.belong);
+        let status = self.run_inner(buf, input_option);
+        self.do_if_has_new(buf, input_option, status, false, 0, cond.base.belong);
         self.check_timeout(status, cond)
     }
 
-    pub fn run_sync(&mut self, buf: &Vec<u8>) {
+    pub fn run_sync(&mut self, buf: &Vec<u8>, input_option : usize) {
         self.run_init();
-        let status = self.run_inner(buf);
-        self.do_if_has_new(buf, status, false, 0, 0);
+        let status = self.run_inner(buf, input_option);
+        self.do_if_has_new(buf, input_option, status, false, 0, 0);
     }
 
     fn run_init(&mut self) {
@@ -348,7 +352,7 @@ impl Executor {
         ret_status
     }
 
-    fn run_inner(&mut self, buf: &Vec<u8>) -> StatusType {
+    fn run_inner(&mut self, buf: &Vec<u8>, input_option : usize) -> StatusType {
         self.write_test(buf);
 
         //clear a SHM area which recrods each execution ___.
@@ -358,7 +362,7 @@ impl Executor {
         let ret_status = if let Some(ref mut fs) = self.forksrv {
             fs.run()
         } else {
-            self.run_target(&self.cmd.main, self.cmd.mem_limit, self.cmd.time_limit)
+            self.run_target(&self.cmd.main_bin, &self.cmd.main_args[input_option], self.cmd.mem_limit, self.cmd.time_limit)
         };
         compiler_fence(Ordering::SeqCst);
 
@@ -378,7 +382,7 @@ impl Executor {
                     return defs::SLOW_SPEED;
                 }
             } else {
-                self.run_target(&self.cmd.main, self.cmd.mem_limit, self.cmd.time_limit);
+                self.run_target(&self.cmd.main_bin, &self.cmd.main_args[0], self.cmd.mem_limit, self.cmd.time_limit);
             }
         }
         let used_t = t_start.elapsed();
@@ -386,7 +390,7 @@ impl Executor {
         used_us / 3
     }
 
-    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32) -> Vec<cond_stmt::CondStmt> {
+    fn track(&mut self, id: usize, buf: &Vec<u8>, input_option: usize, speed: u32) -> Vec<cond_stmt::CondStmt> {
         let taint_path = self.cmd.taint_dir.clone().join(format!("taints_{}", id));
         let track_path = self.cmd.tmp_dir.join(format!("track_{}",self.cid));
        // info!("try tracking {}", belong);
@@ -402,7 +406,8 @@ impl Executor {
 
         compiler_fence(Ordering::SeqCst);
         let ret_status = self.run_target(
-            &self.cmd.track,
+            &self.cmd.track_bin,
+            &self.cmd.track_args[input_option],
             config::MEM_LIMIT_TRACK,
             //self.cmd.time_limit *
             config::TIME_LIMIT_TRACK,
@@ -448,13 +453,14 @@ impl Executor {
 
     fn run_target(
         &self,
-        target: &(String, Vec<String>),
+        target_bin : &String,
+        target_args : &Vec<String>,
         mem_limit: u64,
         time_limit: u64,
     ) -> StatusType {
-        let mut cmd = Command::new(&target.0);
+        let mut cmd = Command::new(target_bin);
         let mut child = cmd
-            .args(&target.1)
+            .args(target_args)
             .stdin(Stdio::null())
             .env_clear()
             .envs(&self.envs)

@@ -12,7 +12,8 @@ pub const PREFER_FAST_COND: bool = true;
 pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
-pub const MAP_SIZE_POW2: usize = 20;
+//default : 20
+pub const MAP_SIZE_POW2: usize = 21;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -47,7 +48,7 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 
 //Cheong
 pub const FUNC_REL_HIGH_THRESHOLD : f32 = 0.7;
-pub const FUZZ_TIME_OUT : u32 = 60 * 24;
+pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
 
 
 //MUTATE TC SELECTION assume either one of them or none of them

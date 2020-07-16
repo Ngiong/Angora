@@ -27,6 +27,7 @@ pub struct CondStmt {
     pub ext_offset_size : u32,
     pub ext_offset_size_rel : u32,
     pub belong_changed : usize,
+    pub input_option : usize,
 }
 
 impl PartialEq for CondStmt {
@@ -68,6 +69,7 @@ impl CondStmt {
             ext_offset_size : 0,
             ext_offset_size_rel : 0,
             belong_changed : 0,
+            input_option : 0,
         }
     }
 

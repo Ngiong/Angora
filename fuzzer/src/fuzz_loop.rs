@@ -19,7 +19,6 @@ pub fn fuzz_loop(
     cid : usize,
 ) {
     let search_method = cmd_opt.search_method;
-
     
     let mut executor = Executor::new(
         cmd_opt,

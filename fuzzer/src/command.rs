@@ -1,7 +1,9 @@
 use crate::{check_dep, search, tmpfs};
 use angora_common::defs;
 use std::{
-    env,
+    //env,
+    fs::File,
+    io::{self, BufRead},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -10,7 +12,7 @@ static TMP_DIR: &str = "tmp";
 static INPUT_FILE: &str = "cur_input";
 static FORKSRV_SOCKET_FILE: &str = "forksrv_socket";
 static TRACK_FILE: &str = "track";
-static PIN_ROOT_VAR: &str = "PIN_ROOT";
+//static PIN_ROOT_VAR: &str = "PIN_ROOT";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum InstrumentationMode {
@@ -35,9 +37,10 @@ impl InstrumentationMode {
 #[derive(Debug, Clone)]
 pub struct CommandOpt {
     pub mode: InstrumentationMode,
-    pub id: usize,
-    pub main: (String, Vec<String>),
-    pub track: (String, Vec<String>),
+    pub main_bin : String,
+    pub main_args : Vec<Vec<String>>,
+    pub track_bin : String,
+    pub track_args : Vec<Vec<String>>,
     pub tmp_dir: PathBuf,
     pub taint_dir : PathBuf,
     pub out_file: String,
@@ -52,6 +55,7 @@ pub struct CommandOpt {
     pub ld_library: String,
     pub enable_afl: bool,
     pub enable_exploitation: bool,
+    pub id : usize,
 }
 
 impl CommandOpt {
@@ -65,6 +69,7 @@ impl CommandOpt {
         time_limit: u64,
         enable_afl: bool,
         enable_exploitation: bool,
+        program_option : Option<&str>,
     ) -> Self {
         let mode = InstrumentationMode::from(mode);
         
@@ -81,7 +86,7 @@ impl CommandOpt {
 
         let track_path = tmp_dir.join(TRACK_FILE).to_str().unwrap().to_owned();
 
-        let has_input_arg = pargs.contains(&"@@".to_string()) || pargs.contains(&"@@@".to_string());
+        //let has_input_arg = pargs.contains(&"@@".to_string()) || pargs.contains(&"@@@".to_string());
 
         let clang_lib = Command::new("llvm-config")
             .arg("--libdir")
@@ -96,18 +101,47 @@ impl CommandOpt {
             "You should set track target with -t PROM in LLVM mode!"
         );
 
-        let mut tmp_args = pargs.clone();
-        let main_bin = tmp_args[0].clone();
-        let main_args: Vec<String> = tmp_args.drain(1..).collect();
+        let main_bin = pargs[0].clone();
         let uses_asan = check_dep::check_asan(&main_bin);
         if uses_asan && mem_limit != 0 {
             warn!("The program compiled with ASAN, set MEM_LIMIT to 0 (unlimited)");
             mem_limit = 0;
         }
+        let track_bin = track_target.to_string();
 
-        let track_bin;
-        let mut track_args = Vec::<String>::new();
+        let main_args = match program_option {
+            Some(filename) => {
+                let mut res = vec![];
+                let file = File::open(filename).unwrap();
+                for line in io::BufReader::new(file).lines() {
+                    match line {
+                        Ok(mut line) => {
+                            if line.len() != 0 {
+                                line.retain(|c| c != '\n');
+                                let splits : Vec<&str> = line.split(" ").collect();
+                                let mut tmp = vec![];
+                                for s in splits {
+                                    tmp.push(String::from(s));
+                                }
+                                res.push(tmp);
+                            }
+                        },
+                        _ => {break;}
+                    }
+                }
+                res
+            },
+            None => {
+                let mut tmp = pargs.clone();
+                vec![tmp.drain(1..).collect()]
+            },
+        };
+
+        let track_args = main_args.clone();
+        /*
         if mode.is_pin_mode() {
+            //TODO
+            /*
             let project_bin_dir = env::var(defs::ANGORA_BIN_DIR).expect("Please set ANGORA_PROJ_DIR");
             
             let pin_root =
@@ -126,22 +160,25 @@ impl CommandOpt {
             track_args.push(String::from("--"));
             track_args.push(track_target.to_string());
             track_args.extend(main_args.clone());
+            */
         } else {
             track_bin = track_target.to_string();
             track_args = main_args.clone();
         }
+        */
 
         Self {
             mode,
-            id: 0,
-            main: (main_bin, main_args),
-            track: (track_bin, track_args),
+            main_bin : main_bin,
+            main_args : main_args,
+            track_bin : track_bin,
+            track_args : track_args,
             tmp_dir,
             taint_dir,
             out_file: out_file,
             forksrv_socket_path,
             track_path,
-            is_stdin: !has_input_arg,
+            is_stdin: false, // !has_input_arg,
             search_method: search::parse_search_method(search_method),
             mem_limit,
             time_limit,
@@ -150,6 +187,7 @@ impl CommandOpt {
             ld_library,
             enable_afl,
             enable_exploitation,
+            id: 0,
         }
     }
 
@@ -160,22 +198,25 @@ impl CommandOpt {
         let new_forksrv_socket_path = format!("{}_{}", &cmd_opt.forksrv_socket_path, id);
         let new_track_path = format!("{}_{}", &cmd_opt.track_path, id);
         if !self.is_stdin {
-            for arg in &mut cmd_opt.main.1 {
-                if arg == "@@" {
-                    *arg = new_file.clone();
-                } else if arg == "@@@" {
-                    *arg = new_file2.clone();
+            for main_args in cmd_opt.main_args.iter_mut() {
+                for arg in main_args.iter_mut() {
+                    if arg == "@@" {
+                        *arg = new_file.clone();
+                    } else if arg == "@@@" {
+                        *arg = new_file2.clone();
+                    }
                 }
             }
-            for arg in &mut cmd_opt.track.1 {
-                if arg == "@@" {
-                    *arg = new_file.clone();
-                } else if arg == "@@@" {
-                    *arg = new_file2.clone();
+            for track_args in cmd_opt.track_args.iter_mut() {
+                for arg in track_args.iter_mut() {
+                    if arg == "@@" {
+                        *arg = new_file.clone();
+                    } else if arg == "@@@" {
+                        *arg = new_file2.clone();
+                    }
                 }
             }
         }
-        cmd_opt.id = id;
         cmd_opt.out_file = new_file.to_owned();
         cmd_opt.forksrv_socket_path = new_forksrv_socket_path.to_owned();
         cmd_opt.track_path = new_track_path.to_owned();

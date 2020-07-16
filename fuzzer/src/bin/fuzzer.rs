@@ -82,9 +82,15 @@ fn main() {
         .arg(Arg::with_name("num_of_func")
              .short("C")
              .long("num_of_func")
-             .value_name("FUNC2")
+             .value_name("FILE")
              .help("Function info txt file")
              .takes_value(true))
+        .arg(Arg::with_name("program_option")
+          .short("O")
+          .long("program_option")
+          .value_name("FILE")
+          .help("input option txt file")
+          .takes_value(true))
        .get_matches();
 
     fuzz_main(
@@ -101,5 +107,6 @@ fn main() {
         matches.occurrences_of("disable_afl_mutation") == 0,
         matches.occurrences_of("disable_exploitation") == 0,
         matches.value_of("num_of_func"),
+        matches.value_of("program_option"),
     );
 }

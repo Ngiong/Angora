@@ -29,7 +29,8 @@ pub struct Forksrv {
 impl Forksrv {
     pub fn new(
         socket_path: &str,
-        target: &(String, Vec<String>),
+        target_bin : &String,
+        target_args : &Vec<String>,
         envs: &HashMap<String, String>,
         fd: RawFd,
         is_stdin: bool,
@@ -49,8 +50,8 @@ impl Forksrv {
         let mut envs_fk = envs.clone();
         envs_fk.insert(ENABLE_FORKSRV.to_string(), String::from("TRUE"));
         envs_fk.insert(FORKSRV_SOCKET_PATH_VAR.to_string(), socket_path.to_owned());
-        match Command::new(&target.0)
-            .args(&target.1)
+        match Command::new(target_bin)
+            .args(target_args)
             .stdin(Stdio::null())
             .envs(&envs_fk)
             .stdout(Stdio::null())

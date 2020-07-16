@@ -22,7 +22,7 @@ pub struct Depot {
     pub num_inputs: AtomicUsize,
     pub num_hangs: AtomicUsize,
     pub num_crashes: AtomicUsize,
-    pub dirs: DepotDir,
+    pub dirs: DepotDir
 }
 
 unsafe fn get_func_rel_score(funcid : u32, exec_func_set : &HashSet<u32>, func_rel_map : *mut usize, func_num : usize) -> f32 {
@@ -137,7 +137,14 @@ impl Depot {
             })
     }
 
-    pub unsafe fn add_entries(&self, conds: &Vec<CondStmt>, func_rel_map : *mut usize, func_num : usize, taint_files : &mut HashSet<u32>) {
+    pub unsafe fn add_entries(
+        &self,
+        conds: &Vec<CondStmt>,
+        func_rel_map : *mut usize,
+        func_num : usize,
+        taint_files : &mut HashSet<u32>,
+        input_option : usize,
+    ) {
         let mut q = match self.queue.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
@@ -188,6 +195,7 @@ impl Depot {
                                 let mut cond = cond.clone();
                                 cond.func_rel_score = new_fr_score;
                                 cond.executed_belongs = v.0.executed_belongs.clone();
+                                cond.input_option = input_option;
                                 mem::swap(v.0, &mut cond);
                                 let priority = QPriority::init(cond.base.op);
                                 q.change_priority(&cond, priority);
@@ -204,6 +212,7 @@ impl Depot {
                                                 ,belong));
                       inserted_all = true;
                     };
+                    cond.input_option = input_option;
                     q.push(cond, priority);
                 }
             }

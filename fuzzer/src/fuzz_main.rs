@@ -32,11 +32,13 @@ pub fn fuzz_main(
     sync_afl: bool,
     enable_afl: bool,
     enable_exploitation: bool,
-    num_of_func: Option<&str>
+    num_of_func: Option<&str>,
+    program_option : Option<&str>,
 ) {
     pretty_env_logger::init();
 
     let (seeds_dir, angora_out_dir) = initialize_directories(in_dir, out_dir, sync_afl);
+    
     let command_option = command::CommandOpt::new(
         mode,
         track_target,
@@ -47,8 +49,9 @@ pub fn fuzz_main(
         time_limit,
         enable_afl,
         enable_exploitation,
+        program_option,
     );
-    info!("{:?}", command_option);
+    
     check_dep::check_dep(in_dir, out_dir, &command_option);
 
     let depot = Arc::new(depot::Depot::new(seeds_dir, &angora_out_dir)); //queue for main fuzz loop
@@ -193,18 +196,20 @@ fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : 
     Ok(a) => a,
     Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
   };
-  write!(buff, "out_dir : {}, in_dir : {}, mem_limit : {}, subject: {}, timeout : {}H, tc selection with func_rel : {}, tc selection random : {}, byte_ext_func_rel : {}, byte_ext_random : {} ",
-               out_dir.to_str().unwrap(), in_dir, command.mem_limit, command.main.0,
+  writeln!(buff, "out_dir : {}, in_dir : {}, timeout : {}H, tc selection with func_rel : {}, tc selection random : {}, byte_ext_func_rel : {}, byte_ext_random : {} ",
+               out_dir.to_str().unwrap(), in_dir,
                config::FUZZ_TIME_OUT / 3600, config::TC_SEL_FUNC_REL, config::TC_SEL_RANDOM, config::BYTE_EXT_FUNC_REL, config::BYTE_EXT_RANDOM)
          .expect("Could not write to param file");
-  writeln!(buff, "").expect("Could not write");
-  for s in &command.main.1{
-    write!(buff," {}", s).expect("Could not write to param file");
+  for c in &command.main_args {
+    for s in c {
+        write!(buff," {}", s).unwrap();
+    }
+    writeln!(buff,"").unwrap();
   }
-  writeln!(buff,"").expect("Could nout write to param file");
-  write!(buff, ", MAP_SIZE : {}, H_THRESHOLD: {}",
+         
+  writeln!(buff, ", MAP_SIZE : {}, H_THRESHOLD: {}",
          config::MAP_SIZE_POW2, 
-         config::FUNC_REL_HIGH_THRESHOLD).expect("Could not write to param file");
+         config::FUNC_REL_HIGH_THRESHOLD).unwrap();
 }
 
 fn create_stats_file_and_write_pid(angora_out_dir: &PathBuf) -> PathBuf {

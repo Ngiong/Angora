@@ -57,13 +57,13 @@ impl<'a> SearchHandler<'a> {
     }
 
     pub fn execute(&mut self, buf: &Vec<u8>) {
-        let status = self.executor.run(buf, self.cond);
+        let status = self.executor.run(buf, self.cond.input_option, self.cond);
         self.process_status(status);
     }
 
     pub fn execute_input(&mut self, input: &MutInput) {
         input.write_to_input(&self.cond.offsets, &mut self.buf);
-        let status = self.executor.run(&self.buf, self.cond);
+        let status = self.executor.run(&self.buf, self.cond.input_option, self.cond);
         self.process_status(status);
     }
 
@@ -82,7 +82,7 @@ impl<'a> SearchHandler<'a> {
     }
 
     pub fn execute_input_direct(&mut self) {
-        let status = self.executor.run(&self.buf, self.cond);
+        let status = self.executor.run(&self.buf, self.cond.input_option, self.cond);
         self.process_status(status);
     }
 

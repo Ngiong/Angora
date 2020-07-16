@@ -26,7 +26,8 @@ fn main() {
     // envs.insert(COND_STMT_ENV_VAR.to_string(), cond_stmt.get_id().to_string());
     let mut fs = Forksrv::new(
         "/tmp/angora_speeed_test",
-        &(prom_bin, prom_args),
+        &prom_bin,
+        &prom_args,
         &envs,
         0 as RawFd,
         false,
