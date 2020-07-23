@@ -41,3 +41,5 @@ llvm_mode/build/
 inputs_vuzzer/
 nohup*
 angora_vs.proj.code-workspace
+options/
+OptExtraction/

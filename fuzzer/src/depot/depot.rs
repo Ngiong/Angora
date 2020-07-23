@@ -189,7 +189,9 @@ impl Depot {
                               if !inserted && new_fr_score.len() < config::STMT_BELONGS_LIMIT {
                                 new_fr_score.push((func_rel_score, belong));
                                 inserted_all = true;
-                              } else if new_fr_score.len() > config::STMT_BELONGS_LIMIT { new_fr_score.pop();};
+                              } else if new_fr_score.len() > config::STMT_BELONGS_LIMIT { 
+                                new_fr_score.pop();
+                              };
                             };
                             if v.0.speed > cond.speed {
                                 let mut cond = cond.clone();

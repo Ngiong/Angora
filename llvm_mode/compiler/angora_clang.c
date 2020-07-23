@@ -67,6 +67,7 @@ static void check_type(char *name) {
   u8 *use_fast = getenv("USE_FAST");
   u8 *use_dfsan = getenv("USE_DFSAN");
   u8 *use_track = getenv("USE_TRACK");
+  u8 *use_entry = getenv("USE_ENTRY");
   u8 *use_pin = getenv("USE_PIN");
   if (use_fast) {
     clang_type = CLANG_FAST_TYPE;
@@ -76,7 +77,10 @@ static void check_type(char *name) {
     clang_type = CLANG_TRACK_TYPE;
   } else if (use_pin) {
     clang_type = CLANG_PIN_TYPE;
+  } else if (use_entry) {
+    clang_type = CLANG_ENTRY_TYPE;
   }
+
   if (!strcmp(name, "angora-clang++")) {
     is_cxx = 1;
   }
@@ -102,6 +106,9 @@ static void add_angora_pass() {
   } else if (clang_type == CLANG_TRACK_TYPE || clang_type == CLANG_PIN_TYPE) {
     cc_params[cc_par_cnt++] = "-mllvm";
     cc_params[cc_par_cnt++] = "-TrackMode";
+  } else if (clang_type == CLANG_ENTRY_TYPE) {
+    cc_params[cc_par_cnt++] = "-mllvm";
+    cc_params[cc_par_cnt++] = "-EntryMode";
   }
 
   cc_params[cc_par_cnt++] = "-mllvm";
@@ -125,7 +132,7 @@ static void add_angora_pass() {
 
 static void add_angora_runtime() {
   // cc_params[cc_par_cnt++] = "-I/${HOME}/clang+llvm/include/c++/v1";
-  if (clang_type == CLANG_FAST_TYPE) {
+  if (clang_type == CLANG_FAST_TYPE || clang_type == CLANG_ENTRY_TYPE) {
     cc_params[cc_par_cnt++] = alloc_printf("%s/lib/libruntime_fast.a", obj_path);
   } else if (clang_type == CLANG_TRACK_TYPE || clang_type == CLANG_DFSAN_TYPE) {
     cc_params[cc_par_cnt++] = "-Wl,--whole-archive";
@@ -144,7 +151,7 @@ static void add_angora_runtime() {
     cc_params[cc_par_cnt++] = alloc_printf("%s/lib/pin_stub.o", obj_path);
   }
 
-  if (clang_type != CLANG_FAST_TYPE) {
+  if (clang_type != CLANG_FAST_TYPE && clang_type != CLANG_ENTRY_TYPE) {
     // cc_params[cc_par_cnt++] = "-pthread";
     if (!is_cxx)
       cc_params[cc_par_cnt++] = "-lstdc++";
@@ -260,7 +267,7 @@ static void edit_params(u32 argc, char **argv) {
       cc_params[cc_par_cnt++] = "-D_FORTIFY_SOURCE=2";
   }
 
-  if (!asan_set && clang_type == CLANG_FAST_TYPE) {
+  if (!asan_set && (clang_type == CLANG_FAST_TYPE || clang_type == CLANG_ENTRY_TYPE)) {
     // We did not test Angora on asan and msan..
     if (getenv("ANGORA_USE_ASAN")) {
 
@@ -348,7 +355,7 @@ static void edit_params(u32 argc, char **argv) {
   if (is_cxx) {
     // FIXME: or use the same header
     // cc_params[cc_par_cnt++] = "-I/path-to-llvm/include/c++/v1";
-    if (clang_type == CLANG_FAST_TYPE) {
+    if (clang_type == CLANG_FAST_TYPE || clang_type == CLANG_ENTRY_TYPE) {
       cc_params[cc_par_cnt++] = alloc_printf("-L%s/lib/libcxx_fast/", obj_path);
       cc_params[cc_par_cnt++] = "-stdlib=libc++";
       cc_params[cc_par_cnt++] = "-Wl,--start-group";

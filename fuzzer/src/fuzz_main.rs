@@ -34,12 +34,17 @@ pub fn fuzz_main(
     enable_exploitation: bool,
     num_of_func: Option<&str>,
     program_option : Option<&str>,
+    entry_target : Option<&str>,
 ) {
     pretty_env_logger::init();
 
     let (seeds_dir, angora_out_dir) = initialize_directories(in_dir, out_dir, sync_afl);
+
+    if program_option.is_some() != entry_target.is_some() {
+        panic!("entry file and program options file should be given together");
+    }
     
-    let command_option = command::CommandOpt::new(
+    let mut command_option = command::CommandOpt::new(
         mode,
         track_target,
         pargs,
@@ -49,7 +54,7 @@ pub fn fuzz_main(
         time_limit,
         enable_afl,
         enable_exploitation,
-        program_option,
+        program_option.is_some(),
     );
     
     check_dep::check_dep(in_dir, out_dir, &command_option);
@@ -57,9 +62,8 @@ pub fn fuzz_main(
     let depot = Arc::new(depot::Depot::new(seeds_dir, &angora_out_dir)); //queue for main fuzz loop
     info!("{:?}", depot.dirs);
 
-    let func_num = get_func_num (num_of_func); 
+    let func_num = get_func_num(num_of_func);
 
-    record_parameter(&angora_out_dir, &command_option, in_dir);
     let stats = Arc::new(RwLock::new(stats::ChartStats::new(&track_target ,&out_dir, func_num != 0)));
     let global_branches = Arc::new(branches::GlobalBranches::new());  //To record global path coverage (edge cov?)
     let fuzzer_stats = create_stats_file_and_write_pid(&angora_out_dir);
@@ -74,6 +78,24 @@ pub fn fuzz_main(
         0,
         255
     );
+
+    if program_option.is_some() {
+        let new_args = executor.initial_input_option_analysis(running.clone(), entry_target, program_option, &depot.dirs.seeds_dir);
+
+        command_option.main_args = new_args.clone();
+        command_option.track_args = new_args;
+    }
+
+    record_parameter(&angora_out_dir, &command_option, in_dir, num_jobs);
+
+    println!("main_bin : {}", command_option.main_bin);
+    for main_opt in &command_option.main_args {
+        print!("opt : ");
+        for opt in main_opt {
+            print!("{} ", opt);
+        }
+        println!("");
+    }
 
     //put seed in the queue
     depot::sync_depot(&mut executor, running.clone(), &depot.dirs.seeds_dir);
@@ -190,16 +212,17 @@ fn set_sigint_handler(r: Arc<AtomicBool>) {
     .expect("Error setting SIGINT handler!");
 }
 
-fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : &str) {
+fn record_parameter(out_dir: &PathBuf, command : &command::CommandOpt, in_dir : &str, num_jobs : usize) {
   let fuzz_param = out_dir.join("parameters");
   let mut buff = match fs::File::create(&fuzz_param) {
     Ok(a) => a,
     Err(e) => { error!("Could not create param file : {:?}", e); panic!();}
   };
-  writeln!(buff, "out_dir : {}, in_dir : {}, timeout : {}H, tc selection with func_rel : {}, tc selection random : {}, byte_ext_func_rel : {}, byte_ext_random : {} ",
+  writeln!(buff, "out_dir : {}, in_dir : {},\n timeout : {}H, \ntc selection with func_rel : {}, tc selection random : {},\n byte_ext_func_rel : {}, byte_ext_random : {} ",
                out_dir.to_str().unwrap(), in_dir,
                config::FUZZ_TIME_OUT / 3600, config::TC_SEL_FUNC_REL, config::TC_SEL_RANDOM, config::BYTE_EXT_FUNC_REL, config::BYTE_EXT_RANDOM)
          .expect("Could not write to param file");
+  writeln!(buff, "num cpus : {}", num_jobs).unwrap();
   for c in &command.main_args {
     for s in c {
         write!(buff," {}", s).unwrap();

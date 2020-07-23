@@ -14,8 +14,10 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <fstream>
 #include <stdio.h>
+#include <set>
 #include <stdlib.h>
 #include <unistd.h>
+#include <iostream>
 
 #include "./abilist.h"
 #include "./defs.h"
@@ -27,6 +29,8 @@ using namespace llvm;
 static cl::opt<bool> DFSanMode("DFSanMode", cl::desc("dfsan mode"), cl::Hidden);
 
 static cl::opt<bool> TrackMode("TrackMode", cl::desc("track mode"), cl::Hidden);
+
+static cl::opt<bool> EntryMode("EntryMode", cl::desc("entry mode"), cl::Hidden);
 
 static cl::list<std::string> ClABIListFiles(
     "angora-dfsan-abilist",
@@ -138,6 +142,7 @@ public:
   void visitExploitation(Instruction *Inst);
   void processCall(Instruction *Inst);
   void addFnWrap(Function &F);
+  void collectCollee(Instruction *Inst, std::vector<std::string> *callee_list);
 };
 
 } // namespace
@@ -253,7 +258,7 @@ void AngoraLLVMPass::initVariables(Module &M) {
       GlobalVariable::GeneralDynamicTLSModel, 0, false);
 
   //Add definition of insturmentation functions as global
-  if (FastMode) {
+  if (FastMode || EntryMode) {
     AngoraMapPtr = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                                       GlobalValue::ExternalLinkage, 0,
                                       "__angora_area_ptr");
@@ -368,8 +373,7 @@ void AngoraLLVMPass::initVariables(Module &M) {
 // Angora enable function-call context.
 void AngoraLLVMPass::countEdge(Module &M, BasicBlock &BB) {
   // LLVMContext &C = M.getContext();
-  if (!FastMode ) return;
- 
+
   unsigned int cur_loc = getRandomBasicBlockId();
   ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
 
@@ -523,6 +527,24 @@ void AngoraLLVMPass::visitCallInst(Instruction *Inst) {
   processCall(Inst);
 };
 
+void AngoraLLVMPass::collectCollee(Instruction *Inst, std::vector<std::string> *callee_list) {
+  CallInst *Caller = dyn_cast<CallInst>(Inst);
+  Function *Callee = Caller->getCalledFunction();
+
+  if (!Callee || Callee->isIntrinsic() || isa<InlineAsm>(Caller->getCalledValue())) {
+    return;
+  }
+
+  // remove inserted "unfold" functions
+  if (!Callee->getName().compare(StringRef("__unfold_branch_fn"))) {
+    if (Caller->use_empty()) {
+      Caller->eraseFromParent();
+    }
+    return;
+  }
+  callee_list->push_back(Callee->getName());
+}
+
 void AngoraLLVMPass::visitInvokeInst(Instruction *Inst) {
 
   InvokeInst *Caller = dyn_cast<InvokeInst>(Inst);
@@ -618,7 +640,7 @@ void AngoraLLVMPass::processCmp(Instruction *Cond, Constant *Cid,
 
   IRBuilder<> IRB(InsertPoint);
 
-  if (FastMode) {
+  if (FastMode || EntryMode) {
   /*
     OpArg[0] = castArgType(IRB, OpArg[0]);
     OpArg[1] = castArgType(IRB, OpArg[1]);
@@ -681,7 +703,7 @@ void AngoraLLVMPass::processBoolCmp(Value *Cond, Constant *Cid,
   Value *OpArg[2];
   OpArg[1] = ConstantInt::get(Int64Ty, 1);
   IRBuilder<> IRB(InsertPoint);
-  if (FastMode) {
+  if (FastMode || EntryMode) {
     LoadInst *CurCid = IRB.CreateLoad(AngoraCondId);
     setInsNonSan(CurCid);
     Value *CmpEq = IRB.CreateICmpEQ(Cid, CurCid);
@@ -760,7 +782,7 @@ void AngoraLLVMPass::visitSwitchInst(Module &M, Instruction *Inst) {
   Constant *Cid = ConstantInt::get(Int32Ty, iid);
   IRBuilder<> IRB(Sw);
 
-  if (FastMode) {
+  if (FastMode || EntryMode) {
     LoadInst *CurCid = IRB.CreateLoad(AngoraCondId);
     setInsNonSan(CurCid);
     Value *CmpEq = IRB.CreateICmpEQ(Cid, CurCid);
@@ -853,13 +875,38 @@ void AngoraLLVMPass::visitExploitation(Instruction *Inst) {
   }
 }
 
+class CallGraphNode {
+public:
+  std::string name;
+  std::vector<std::string> callees;
+
+  CallGraphNode(std::string name, std::vector<std::string> callees) {
+    this->name = name;
+    this->callees = callees;
+  };
+};
+
+class CallGraph {
+  public:
+
+    std::vector<CallGraphNode> functions;
+
+    void addFunction(CallGraphNode node) {
+      functions.push_back(node);
+    }
+
+    CallGraph() {};
+};
+
 bool AngoraLLVMPass::runOnModule(Module &M) {
 
   //SAYF(cCYA "angora-llvm-pass\n");
   if (TrackMode) {
     OKF("Track Mode.");
   } else if (DFSanMode) {
-    //OKF("DFSan Mode.");
+    OKF("DFSan Mode.");
+  } else if (EntryMode) {
+    OKF("Entry Mode.");
   } else {
     FastMode = true;
     OKF("Fast Mode.");
@@ -872,10 +919,89 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
 
   CurFuncId = 0;
 
+  CallGraph callGraph;
+  std::vector<std::string> func_id;
+  std::set<u32> entry_ids;
+
+  if (EntryMode) {
+    for (auto &F : M) {
+      if (F.isDeclaration())
+        continue;
+
+      func_id.push_back(F.getName());
+      std::vector<std::string> callee_list;
+
+      std::vector<BasicBlock *> bb_list;
+      for (auto bb = F.begin(); bb != F.end(); bb++)
+        bb_list.push_back(&(*bb));
+
+      for (auto bi = bb_list.begin(); bi != bb_list.end(); bi++) {
+        BasicBlock *BB = *bi;
+        std::vector<Instruction *> inst_list;
+
+        for (auto inst = BB->begin(); inst != BB->end(); inst++) {
+          Instruction *Inst = &(*inst);
+          inst_list.push_back(Inst);
+        }
+
+        for (auto inst = inst_list.begin(); inst != inst_list.end(); inst++) {
+          Instruction *Inst = *inst;
+          if (Inst->getMetadata(NoSanMetaId))
+            continue;
+
+          if (isa<CallInst>(Inst)) {
+            collectCollee(Inst, &callee_list);
+          }
+        }
+      }
+
+      callGraph.addFunction(CallGraphNode(F.getName(), callee_list));
+    }
+
+    std::vector<std::string> entries;
+
+    std::vector<std::string> caller_tmp;
+    caller_tmp.push_back("main");
+    for (auto i=0; i < ENTRY_DEPTH; i++) {
+      std::vector<std::string> callee_tmp;
+      for (auto caller_name : caller_tmp) {
+        //std::cout << "searching for " << caller_name << "\n";
+        for (auto caller : callGraph.functions) {
+          //std::cout << "comparing with "<< caller.name << "\n";
+          if (caller_name == caller.name) {
+            //std::cout << "caller matched\n";
+            for (auto callee_name : caller.callees) {
+              callee_tmp.push_back(callee_name);
+            }
+            break;
+          }
+        }
+      }
+      for (auto caller : caller_tmp) {
+        entries.push_back(caller);
+      }
+      caller_tmp.clear();
+      for (auto callee : callee_tmp) {
+        caller_tmp.push_back(callee);
+      }
+    }
+    for (auto caller : caller_tmp) {
+      entries.push_back(caller);
+    }
+
+    for (auto entry_func : entries) {
+      for (auto i = 0; i < func_id.size() ; i++) {
+        if (func_id.at(i) == entry_func) {
+          entry_ids.insert(i);
+          break;
+        }
+      }
+    }
+  }
+
   for (auto &F : M) {
     if (F.isDeclaration())
       continue;
-
 
     addFnWrap(F);
     std::vector<BasicBlock *> bb_list;
@@ -896,7 +1022,9 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         if (Inst->getMetadata(NoSanMetaId))
           continue;
         if (Inst == &(*BB->getFirstInsertionPt())) {
-          countEdge(M, *BB); //execute only in fast mode
+          if (FastMode || (EntryMode && (entry_ids.find(CurFuncId) != entry_ids.end()))) {
+            countEdge(M, *BB);//execute only in fast mode
+          }
         }
         if (isa<CallInst>(Inst)) {
           visitCallInst(Inst);

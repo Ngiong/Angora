@@ -49,7 +49,7 @@ pub const MAX_SPLICE_TIMES: usize = 45;
 //Cheong
 pub const FUNC_REL_HIGH_THRESHOLD : f32 = 0.7;
 pub const FUZZ_TIME_OUT : u32 = 60 * 60 * 24;
-
+pub const INIT_TIME_OUT : u32 = FUZZ_TIME_OUT / 100;
 
 //MUTATE TC SELECTION assume either one of them or none of them
 pub const TC_SEL_FUNC_REL : bool = true;
@@ -59,7 +59,8 @@ pub const TC_SEL_RANDOM : bool = false;
 pub const BYTE_EXT_FUNC_REL : bool = true;
 pub const BYTE_EXT_RANDOM : bool = false;
 
-pub const FUNC_CMP_SIZE : usize = 1;
+pub const ENTRY_DEPTH : usize = 2;
 pub const STMT_BELONGS_LIMIT : usize = 8;
 
 pub const STATE_LONG_FUZZ_TIME : [u32; 5] = [8,1,1,8,8];  //first,second,merged,func,func_rel
+pub const NUM_TOP_OPTS : usize = 5;

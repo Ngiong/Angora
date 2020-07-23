@@ -175,6 +175,51 @@ impl Branches {
 
         (true, has_new_edge, edge_num)
     }
+
+    pub fn get_num_new_branches(&mut self) -> usize {
+        let gb_map = &self.global.virgin_branches;
+        let path = self.get_path();
+        
+        let mut to_write = vec![];
+        let mut num_new_edge = 0;
+        {
+            // read only
+            let gb_map_read = gb_map.read().unwrap();
+            for &br in &path {
+                let gb_v = gb_map_read[br.0];
+
+                if gb_v == 255u8 {  //never touched edge (branch)
+                    num_new_edge += 1;
+                }
+
+                if (br.1 & gb_v) > 0 {
+                    to_write.push((br.0, gb_v & (!br.1)));
+                }
+            }
+        }
+
+        if to_write.is_empty() {
+            return 0;
+        }
+
+        {
+            // write
+            let mut gb_map_write = gb_map.write().unwrap();
+            for &br in &to_write {
+                gb_map_write[br.0] = br.1;
+            }
+        }
+
+        num_new_edge
+    }
+
+    pub fn clear_global(&mut self) {
+        let gb_map = &self.global.virgin_branches;
+        let mut gb_map_write = gb_map.write().unwrap();
+        for idx in 0..BRANCHES_SIZE {
+            gb_map_write[idx] = 255u8;
+        }
+    }
 }
 
 impl std::fmt::Debug for Branches {

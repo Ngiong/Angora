@@ -10,7 +10,7 @@ use angora_common::{config, defs};
 use std::{
     //ops::{Deref, DerefMut},
     fs,
-    //fs::OpenOptions,
+    io::{self, BufRead},
     //io::Write,
     collections::{HashMap, HashSet},
     path::Path,
@@ -23,6 +23,9 @@ use std::{
     alloc::{alloc, dealloc, Layout},
     ptr::null_mut,
     time,
+    sync::{
+        atomic::AtomicBool,
+    },
 };
 use wait_timeout::ChildExt;
 
@@ -31,7 +34,7 @@ pub struct Executor {
     pub branches: branches::Branches,
     pub t_conds: cond_stmt::ShmConds,
     envs: HashMap<String, String>,
-    forksrv: Option<Forksrv>,
+    forksrv: Option<Vec<Forksrv>>,
     depot: Arc<depot::Depot>,
     fd: PipeFd,
     tmout_cnt: usize,
@@ -138,20 +141,37 @@ impl Executor {
     pub fn rebind_forksrv(&mut self) {
         {
             // delete the old forksrv
+            warn!("rebinding forksrv");
+            if let Some(forksrvs) = &mut self.forksrv {
+                for forksrv in forksrvs {
+                    match forksrv.child.try_wait() {
+                        Ok(_) => {
+
+                        },
+                        Err(e) => {
+                            warn!("Tried to wait, but child does not exited : {:?}", e);
+                        }
+                    }
+                }                
+            }
             self.forksrv = None;
         }
-        let fs = forksrv::Forksrv::new(
-            &self.cmd.forksrv_socket_path,
-            &self.cmd.main_bin,
-            &self.cmd.main_args[0],
-            &self.envs,
-            self.fd.as_raw_fd(),
-            self.cmd.is_stdin,
-            self.cmd.uses_asan,
-            self.cmd.time_limit,
-            self.cmd.mem_limit,
-        );
-        self.forksrv = Some(fs);
+        let mut res = vec![];
+        for i in 0..self.cmd.main_args.len() {
+            let fs = forksrv::Forksrv::new(
+                &self.cmd.forksrv_socket_path[i],
+                &self.cmd.main_bin,
+                &self.cmd.main_args[i],
+                &self.envs,
+                self.fd.as_raw_fd(),
+                self.cmd.is_stdin,
+                self.cmd.uses_asan,
+                self.cmd.time_limit,
+                self.cmd.mem_limit,
+            );
+            res.push(fs);
+        }
+        self.forksrv = Some(res);
     }
 
     // FIXME: The location id may be inconsistent between track and fast programs.
@@ -360,7 +380,7 @@ impl Executor {
 
         compiler_fence(Ordering::SeqCst);
         let ret_status = if let Some(ref mut fs) = self.forksrv {
-            fs.run()
+            fs[input_option].run()
         } else {
             self.run_target(&self.cmd.main_bin, &self.cmd.main_args[input_option], self.cmd.mem_limit, self.cmd.time_limit)
         };
@@ -376,7 +396,7 @@ impl Executor {
                 self.fd.rewind();
             }
             if let Some(ref mut fs) = self.forksrv {
-                let status = fs.run();
+                let status = fs[0].run();
                 if status == StatusType::Error {
                     self.rebind_forksrv();
                     return defs::SLOW_SPEED;
@@ -526,6 +546,235 @@ impl Executor {
         self.tmout_cnt = 0;
         self.invariable_cnt = 0;
         self.last_f = defs::UNREACHABLE;
+    }
+
+    pub fn initial_input_option_analysis(
+        &mut self,
+        running: Arc<AtomicBool>,
+        entry_file : Option<&str>,
+        program_option : Option<&str>,
+        seeds_dir : &Path,
+    ) -> Vec<Vec<String>> {
+        if let Some(ef) = entry_file {
+
+            let main_bin = self.cmd.main_bin.clone();
+            self.cmd.main_bin = String::from(ef);
+
+            let mut options = vec![];
+            let file = fs::File::open(program_option.unwrap()).unwrap();
+            for line in io::BufReader::new(file).lines() {
+                match line {
+                    Ok(mut line) => {
+                        if line.len() != 0 {
+                            line.retain(|c| c != '\n');
+                            options.push(line);
+                        }
+                    },
+                    _ => {break; }
+                }
+            }
+
+            //let mut function_covered = HashSet::new();
+            let mut num_seeds = 0;
+            let mut num_zero = 0;
+            let mut top_opts : Vec<(usize, Vec<String>)> = vec![];
+            let file_name = self.cmd.out_file.clone();
+            for seed in seeds_dir.read_dir().expect("read_dir call failed on seeds dir") {
+                if !running.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                if let Ok(entry) = seed {
+                    let path = &entry.path();
+                    if path.is_file() {
+                        let file_len =
+                            fs::metadata(path).expect("Could not fetch metadata.").len() as usize;
+                        if file_len < config::MAX_INPUT_LEN {
+                            num_seeds += 1;
+                            let buf = depot::file::read_from_file(path);
+
+                            let opts = vec![file_name.clone()];
+                            //Empty args 
+                            self.cmd.main_args[0] = opts.clone();
+
+                            self.run_init();
+                            self.run_inner(&buf, 0);
+                            let num_new_branch = self.branches.get_num_new_branches();
+                            if num_new_branch != 0 {
+                                let mut inserted = false;
+                                for (idx, elem) in top_opts.iter().enumerate() {
+                                    if elem.1 == opts {
+                                        inserted = true;
+                                        break;
+                                    }
+                                    if elem.0 < num_new_branch {
+                                        top_opts.insert(idx, (num_new_branch, opts.clone()));
+                                        inserted = true;
+                                        break;
+                                    }
+                                }
+                                if top_opts.len() < config::NUM_TOP_OPTS && !inserted {
+                                    top_opts.push((num_new_branch, vec![file_name.clone()]));
+                                }
+                                if top_opts.len() > config::NUM_TOP_OPTS {
+                                    top_opts.pop();
+                                }
+                            } else {
+                                num_zero += 1;
+                            }
+
+                            for opt in &options {
+                                let opt_string = String::from(opt);
+                                let mut opts = opt.split(' ').map(String::from).collect::<Vec<String>>();
+
+                                if !opt_string.contains("@@") {
+                                    opts.push(file_name.clone());
+                                } else {
+                                    for opt in &mut opts {
+                                        if *opt == "@@" {
+                                            *opt = file_name.clone();
+                                        }
+                                    }
+                                }
+
+                                self.cmd.main_args[0] = opts.clone();
+
+                                self.run_init();
+                                self.run_inner(&buf, 0);
+                                let num_new_branch = self.branches.get_num_new_branches();
+                                if num_new_branch != 0 {
+                                    let mut inserted = false;
+                                    for (idx, elem) in top_opts.iter().enumerate() {
+                                        if elem.1 == opts {
+                                            inserted = true;
+                                            break;
+                                        }
+                                        if elem.0 < num_new_branch {
+                                            top_opts.insert(idx, (num_new_branch, opts.clone()));
+                                            inserted = true;
+                                            break;
+                                        }
+                                    }
+                                    if top_opts.len() < config::NUM_TOP_OPTS && !inserted {
+                                        top_opts.push((num_new_branch, opts));
+                                    }
+                                    if top_opts.len() > config::NUM_TOP_OPTS {
+                                        top_opts.pop();
+                                    }
+                                } else {
+                                    num_zero += 1;
+                                }
+                            }
+
+                            for opt1 in &options {
+                                for opt2 in &options {
+                                    let opt1_string = String::from(opt1);
+                                    let opt2_string = String::from(opt2);
+
+                                    if opt1_string.contains("@@") && opt2_string.contains("@@") {
+                                        continue;
+                                    }
+
+                                    let mut opts = opt1.split(' ').map(String::from).collect::<Vec<String>>();
+                                    let mut tmp = opt2.split(' ').map(String::from).collect::<Vec<String>>();
+
+                                    opts.append(&mut tmp);
+
+                                    if !(opt1_string.contains("@@") || opt2_string.contains("@@")) {
+                                        opts.push(file_name.clone());
+                                    };
+
+                                    self.cmd.main_args[0] = opts.clone();
+
+                                    self.run_init();
+                                    self.run_inner(&buf, 0);
+                                    let num_new_branch = self.branches.get_num_new_branches();
+                                    if num_new_branch != 0 {
+                                        let mut inserted = false;
+                                        for (idx, elem) in top_opts.iter().enumerate() {
+                                            if elem.1 == opts {
+                                                inserted = true;
+                                                break;
+                                            }
+                                            if elem.0 < num_new_branch {
+                                                top_opts.insert(idx, (num_new_branch, opts.clone()));
+                                                inserted = true;
+                                                break;
+                                            }
+                                        }
+                                        if top_opts.len() < config::NUM_TOP_OPTS && !inserted {
+                                            top_opts.push((num_new_branch, opts));
+                                        }
+                                        if top_opts.len() > config::NUM_TOP_OPTS {
+                                            top_opts.pop();
+                                        }
+                                    } else {
+                                        num_zero += 1;
+                                    }
+                                }
+                            }
+                        } else {
+                            warn!("Seed discarded, too long: {:?}", path);
+                        }
+                    }
+                }
+            }
+
+            let num_opt = options.len();
+            println!("summary : num_seeds : {}, num_option : {}, total_exec : {}, zero_new : {}",
+                num_seeds,
+                num_opt,
+                (num_opt + num_opt * num_opt) * num_seeds,
+                num_zero,
+            );
+            println!("top opts : ");
+            for (num_branch, opts) in &top_opts {
+                print!("{}, ", num_branch);
+                for opt in opts {
+                    print!("{} ", opt);
+                }
+                println!("");
+            }
+            self.cmd.main_args = vec![];
+
+            let mut res = vec![];
+            for (_num_branch, opts) in &top_opts {
+                let mut tmp = vec![];
+                for opt in opts {
+                    if *opt == file_name {
+                        tmp.push(String::from("@@"));
+                    } else {
+                        tmp.push(opt.clone());
+                    }
+                }
+                res.push(tmp);
+            }
+            for (_num_branch, opts) in top_opts {
+
+                self.cmd.main_args.push(opts);
+            }
+            self.cmd.track_args = self.cmd.main_args.clone();
+            self.cmd.main_bin = main_bin;
+
+            self.branches.clear_global();
+
+            //set forksrv_path
+            let forksrv_socket_path = &self.cmd.forksrv_socket_path[0];
+
+            let mut new_paths = vec![];
+            for i in 0..self.cmd.main_args.len() {
+                let new_path = format!("{}_{}", forksrv_socket_path, i);
+                new_paths.push(new_path);
+            }
+
+            self.cmd.forksrv_socket_path = new_paths;
+
+            self.rebind_forksrv();
+
+            res
+        } else {
+            vec![]
+        }
     }
 }
 

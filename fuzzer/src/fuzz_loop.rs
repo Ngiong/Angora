@@ -2,12 +2,13 @@ use crate::{
     branches::GlobalBranches, command::CommandOpt, cond_stmt::NextState, depot::Depot,
     executor::Executor, fuzz_type::FuzzType, search::*, stats,
 };
-//use angora_common::config;
+use angora_common::config;
 use rand::prelude::*;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
+use std::time::{Duration, Instant};
 
 pub fn fuzz_loop(
     running: Arc<AtomicBool>,
@@ -29,7 +30,25 @@ pub fn fuzz_loop(
         cid,
     );
 
+    let mut new_forksrv_socket_path = vec![];
+    for i in 0..executor.cmd.main_args.len() {
+        new_forksrv_socket_path.push(format!("{}_{}", executor.cmd.forksrv_socket_path[0], i));
+    }
+    executor.cmd.forksrv_socket_path = new_forksrv_socket_path;
+
+    executor.rebind_forksrv();
+
+    let mut init_input_option_idx = 0;
+    let init_time_out = Duration::from_secs(config::INIT_TIME_OUT.into());
+    let mut init_time = Instant::now();
+
     while running.load(Ordering::Relaxed) {
+
+        if init_input_option_idx < executor.cmd.main_args.len() && init_time.elapsed() >= init_time_out {
+            init_time = Instant::now();
+            init_input_option_idx += 1;
+        }
+
         let entry = match depot.get_entry() {
             Some(e) => e,
             None => break,
@@ -44,6 +63,12 @@ pub fn fuzz_loop(
 
         if cond.is_done() {
             depot.update_entry(cond);
+            continue;
+        }
+
+        if init_input_option_idx < executor.cmd.main_args.len() &&
+            init_input_option_idx != cond.input_option
+        {
             continue;
         }
 

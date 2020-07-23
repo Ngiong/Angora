@@ -2,8 +2,8 @@ use crate::{check_dep, search, tmpfs};
 use angora_common::defs;
 use std::{
     //env,
-    fs::File,
-    io::{self, BufRead},
+    //fs::File,
+    //io::{self, BufRead},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -44,7 +44,7 @@ pub struct CommandOpt {
     pub tmp_dir: PathBuf,
     pub taint_dir : PathBuf,
     pub out_file: String,
-    pub forksrv_socket_path: String,
+    pub forksrv_socket_path: Vec<String>,
     pub track_path: String,
     pub is_stdin: bool,
     pub search_method: search::SearchMethod,
@@ -69,7 +69,7 @@ impl CommandOpt {
         time_limit: u64,
         enable_afl: bool,
         enable_exploitation: bool,
-        program_option : Option<&str>,
+        program_option : bool,
     ) -> Self {
         let mode = InstrumentationMode::from(mode);
         
@@ -109,32 +109,11 @@ impl CommandOpt {
         }
         let track_bin = track_target.to_string();
 
-        let main_args = match program_option {
-            Some(filename) => {
-                let mut res = vec![];
-                let file = File::open(filename).unwrap();
-                for line in io::BufReader::new(file).lines() {
-                    match line {
-                        Ok(mut line) => {
-                            if line.len() != 0 {
-                                line.retain(|c| c != '\n');
-                                let splits : Vec<&str> = line.split(" ").collect();
-                                let mut tmp = vec![];
-                                for s in splits {
-                                    tmp.push(String::from(s));
-                                }
-                                res.push(tmp);
-                            }
-                        },
-                        _ => {break;}
-                    }
-                }
-                res
-            },
-            None => {
-                let mut tmp = pargs.clone();
-                vec![tmp.drain(1..).collect()]
-            },
+        let main_args = if program_option {
+            vec![vec![String::from("@@")]]
+        } else {
+            let mut tmp = pargs.clone();
+            vec![tmp.drain(1..).collect()]
         };
 
         let track_args = main_args.clone();
@@ -176,7 +155,7 @@ impl CommandOpt {
             tmp_dir,
             taint_dir,
             out_file: out_file,
-            forksrv_socket_path,
+            forksrv_socket_path : vec![forksrv_socket_path],
             track_path,
             is_stdin: false, // !has_input_arg,
             search_method: search::parse_search_method(search_method),
@@ -194,16 +173,13 @@ impl CommandOpt {
     pub fn specify(&self, id: usize) -> Self {
         let mut cmd_opt = self.clone();
         let new_file = format!("{}_{}", &cmd_opt.out_file, id);
-        let new_file2 = format!("@{}_{}", &cmd_opt.out_file, id);
-        let new_forksrv_socket_path = format!("{}_{}", &cmd_opt.forksrv_socket_path, id);
+        let new_forksrv_socket_path = format!("{}_{}", &cmd_opt.forksrv_socket_path[0], id);
         let new_track_path = format!("{}_{}", &cmd_opt.track_path, id);
         if !self.is_stdin {
             for main_args in cmd_opt.main_args.iter_mut() {
                 for arg in main_args.iter_mut() {
                     if arg == "@@" {
                         *arg = new_file.clone();
-                    } else if arg == "@@@" {
-                        *arg = new_file2.clone();
                     }
                 }
             }
@@ -211,14 +187,12 @@ impl CommandOpt {
                 for arg in track_args.iter_mut() {
                     if arg == "@@" {
                         *arg = new_file.clone();
-                    } else if arg == "@@@" {
-                        *arg = new_file2.clone();
                     }
                 }
             }
         }
         cmd_opt.out_file = new_file.to_owned();
-        cmd_opt.forksrv_socket_path = new_forksrv_socket_path.to_owned();
+        cmd_opt.forksrv_socket_path = vec![new_forksrv_socket_path.to_owned()];
         cmd_opt.track_path = new_track_path.to_owned();
         cmd_opt.is_raw = false;
         cmd_opt

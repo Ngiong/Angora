@@ -91,6 +91,12 @@ fn main() {
           .value_name("FILE")
           .help("input option txt file")
           .takes_value(true))
+       .arg(Arg::with_name("entry_file")
+         .short("e")
+         .long("entry_target")
+         .value_name("PROM")
+         .help("record only entry point branches")
+         .takes_value(true))
        .get_matches();
 
     fuzz_main(
@@ -108,5 +114,6 @@ fn main() {
         matches.occurrences_of("disable_exploitation") == 0,
         matches.value_of("num_of_func"),
         matches.value_of("program_option"),
+        matches.value_of("entry_file"),
     );
 }

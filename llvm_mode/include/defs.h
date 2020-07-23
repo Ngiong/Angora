@@ -7,8 +7,8 @@
 #define MAP_SIZE (1 << MAP_SIZE_POW2)
 #define ENABLE_UNFOLD_BRANCH 1
 
-#ifndef FUNC_CMP_SIZE
-#define FUNC_CMP_SIZE 10
+#ifndef ENTRY_DEPTH
+#define ENTRY_DEPTH 3
 #endif
 // #define DEBUG_INFO
 // #define ALLOC_PRELOAD
@@ -21,6 +21,8 @@
 #define CLANG_DFSAN_TYPE 2
 // Use libdft implemented by intel pin
 #define CLANG_PIN_TYPE 3
+
+#define CLANG_ENTRY_TYPE 4
 
 #define CUSTOM_FN_CTX "ANGORA_CUSTOM_FN_CONTEXT"
 #define GEN_ID_RANDOM_VAR "ANGORA_GEN_ID_RANDOM"
