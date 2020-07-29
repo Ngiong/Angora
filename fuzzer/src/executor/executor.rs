@@ -146,10 +146,11 @@ impl Executor {
                 for forksrv in forksrvs {
                     match forksrv.child.try_wait() {
                         Ok(_) => {
-
                         },
                         Err(e) => {
-                            warn!("Tried to wait, but child does not exited : {:?}", e);
+                            if let Ok(_) = forksrv.child.kill() {
+                            };
+                            warn!("Tried to wait, but child does not exited, sent SIGKILL. : {:?}", e);
                         }
                     }
                 }                

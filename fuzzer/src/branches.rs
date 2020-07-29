@@ -1,7 +1,9 @@
 use crate::executor::StatusType;
-use angora_common::{config::BRANCHES_SIZE, shm::SHM};
+use angora_common::{config::{BRANCHES_SIZE, ENTRY_BRANCHES_SIZE}, shm::SHM};
 use std::{
     self,
+    fs::File,
+    io::Write,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, RwLock,
@@ -218,6 +220,19 @@ impl Branches {
         let mut gb_map_write = gb_map.write().unwrap();
         for idx in 0..BRANCHES_SIZE {
             gb_map_write[idx] = 255u8;
+        }
+    }
+
+    pub fn get_cov(&self) -> usize {
+        self.global.density.load(Ordering::Relaxed)
+    }
+
+    pub fn write_cov(&self, file : &mut File) {
+        let gb_map = &self.global.virgin_branches;
+        let gb_map_read = gb_map.read().unwrap();
+
+        for i in 0..ENTRY_BRANCHES_SIZE {
+            write!(file, "{},", if gb_map_read[i] != 255 { 1 } else { 0 }).unwrap();
         }
     }
 }

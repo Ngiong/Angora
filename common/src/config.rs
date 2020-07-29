@@ -13,7 +13,7 @@ pub const MAX_INPUT_LEN: usize = 15000;
 
 // branch.rs
 //default : 20
-pub const MAP_SIZE_POW2: usize = 21;
+pub const MAP_SIZE_POW2: usize = 20;
 pub const BRANCHES_SIZE: usize = 1 << MAP_SIZE_POW2;
 
 // executor.rs:
@@ -59,8 +59,12 @@ pub const TC_SEL_RANDOM : bool = false;
 pub const BYTE_EXT_FUNC_REL : bool = true;
 pub const BYTE_EXT_RANDOM : bool = false;
 
-pub const ENTRY_DEPTH : usize = 2;
 pub const STMT_BELONGS_LIMIT : usize = 8;
 
 pub const STATE_LONG_FUZZ_TIME : [u32; 5] = [8,1,1,8,8];  //first,second,merged,func,func_rel
+
+//input option selection
+pub const ENTRY_DEPTH : usize = 2;
 pub const NUM_TOP_OPTS : usize = 5;
+pub const ENTRY_MAP_SIZE_POW2: usize = 10;
+pub const ENTRY_BRANCHES_SIZE: usize = 1 << ENTRY_MAP_SIZE_POW2;

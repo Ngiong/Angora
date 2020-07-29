@@ -62,6 +62,7 @@ class AngoraLLVMPass : public ModulePass {
 public:
   static char ID;
   bool FastMode = false;
+  u32 mapsize = MAP_SIZE;
   std::string ModName;
   u32 ModId;
   u32 CidCounter;
@@ -149,7 +150,7 @@ public:
 
 char AngoraLLVMPass::ID = 0;
 
-u32 AngoraLLVMPass::getRandomBasicBlockId() { return random() % MAP_SIZE; }
+u32 AngoraLLVMPass::getRandomBasicBlockId() { return random() % mapsize; }
 
 // http://pubs.opengroup.org/onlinepubs/009695399/functions/rand.html
 u32 AngoraLLVMPass::getRandomNum() {
@@ -160,7 +161,7 @@ u32 AngoraLLVMPass::getRandomNum() {
 void AngoraLLVMPass::setRandomNumSeed(u32 seed) { RandSeed = seed; }
 
 u32 AngoraLLVMPass::getRandomContextId() {
-  u32 context = getRandomNum() % MAP_SIZE;
+  u32 context = getRandomNum() % mapsize;
   if (output_cond_loc) {
     errs() << "[CONTEXT] " << context << "\n";
   }
@@ -924,6 +925,8 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
   std::set<u32> entry_ids;
 
   if (EntryMode) {
+    mapsize = MAP_SIZE_ENTRY;
+
     for (auto &F : M) {
       if (F.isDeclaration())
         continue;
@@ -997,7 +1000,10 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         }
       }
     }
+    std::cout << "total number of entry functions : " << entry_ids.size() << "\n";
   }
+
+  int num_of_block = 0;
 
   for (auto &F : M) {
     if (F.isDeclaration())
@@ -1024,6 +1030,7 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         if (Inst == &(*BB->getFirstInsertionPt())) {
           if (FastMode || (EntryMode && (entry_ids.find(CurFuncId) != entry_ids.end()))) {
             countEdge(M, *BB);//execute only in fast mode
+            num_of_block += 1;
           }
         }
         if (isa<CallInst>(Inst)) {
@@ -1047,9 +1054,13 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
   
   std::ofstream func;
   if (FastMode) {
-    func.open("angora_func_id", std::ofstream::out | std::ofstream::app);
+    func.open("angora_func_id", std::ofstream::out);
     func << CurFuncId;
     func.close();
+  }
+
+  if (EntryMode) {
+    std::cout << "num of blocks : " << num_of_block << "\n";
   }
 
   if (is_bc)

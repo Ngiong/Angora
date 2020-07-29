@@ -88,8 +88,7 @@ pub fn fuzz_main(
 
     record_parameter(&angora_out_dir, &command_option, in_dir, num_jobs);
 
-    println!("main_bin : {}", command_option.main_bin);
-    for main_opt in &command_option.main_args {
+     for main_opt in &command_option.main_args {
         print!("opt : ");
         for opt in main_opt {
             print!("{} ", opt);

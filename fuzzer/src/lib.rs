@@ -5,9 +5,9 @@ extern crate log;
 #[macro_use]
 extern crate derive_more;
 
-mod branches;
-mod cond_stmt;
-mod depot;
+pub mod branches;
+pub mod cond_stmt;
+pub mod depot;
 pub mod executor;
 mod mut_input;
 mod search;

@@ -112,10 +112,9 @@ pub fn filter_cond_list(cond_list: &mut Vec<CondStmt>) {
         }
     }
 
-    /*
+    
     debug!(
         "de-dup exploit: {}, explore: {}",
         dedup_exploit, dedup_explore
     );
-    */
 }

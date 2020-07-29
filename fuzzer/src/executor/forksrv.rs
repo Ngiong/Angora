@@ -183,17 +183,17 @@ impl Forksrv {
 
 impl Drop for Forksrv {
     fn drop(&mut self) {
-        warn!("Exit Forksrv");
+        debug!("Exit Forksrv");
         // Tell the child process to exit
         let fin = [0u8; 2];
         if self.socket.write(&fin).is_err() {
-            warn!("Fail to write socket !!  FIN ");
+            debug!("Fail to write socket !!  FIN ");
         }
         let path = Path::new(&self.path);
         if path.exists() {
-            warn!("Removing socket file : {}", path.to_str().unwrap());
+            //warn!("Removing socket file : {}", path.to_str().unwrap());
             if fs::remove_file(&self.path).is_err() {
-                warn!("Fail to remove socket file!!  FIN ");
+                debug!("Fail to remove socket file!!  FIN ");
             }
         }
     }

@@ -7,6 +7,11 @@
 #define MAP_SIZE (1 << MAP_SIZE_POW2)
 #define ENABLE_UNFOLD_BRANCH 1
 
+#ifndef ENTRY_MAP_SIZE_POW2
+#define ENTRY_MAP_SIZE_POW2 8
+#endif
+#define MAP_SIZE_ENTRY (1 << ENTRY_MAP_SIZE_POW2)
+
 #ifndef ENTRY_DEPTH
 #define ENTRY_DEPTH 3
 #endif
