@@ -20,9 +20,16 @@ void __init_argc_argv(int* argc, char **argv[]) {
   *argv = tmp_argv;
 }
 
-void __print_argc_argv(int argc, char *argv[]) {
+int __print_argc_argv(int argc, char *argv[]) {
   printf("Your argc: %d\n", argc);
   for (int i = 0; i < argc; i++) {
     printf("Your argv %d: #%s#\n", i, argv[i]);
   }
+  return __old_main(argc, argv);
+}
+
+int main(int argc, char *argv[]) {
+  int tmp_argc = argc;
+  char **tmp_argv = argv;
+  return __print_argc_argv(tmp_argc, tmp_argv);
 }
