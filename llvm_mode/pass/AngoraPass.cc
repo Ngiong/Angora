@@ -102,7 +102,6 @@ public:
 
   Constant *TraceCmp;
   Constant *TraceSw;
-  Constant *InitArgcArgv;
   Constant *PrintArgcArgv;
   Constant *AlterMain;
   Constant *TraceCmpTT;
@@ -112,7 +111,6 @@ public:
 
   FunctionType *TraceCmpTy;
   FunctionType *TraceSwTy;
-  FunctionType *InitArgcArgvTy;
   FunctionType *PrintArgcArgvTy;
   FunctionType *AlterMainTy;
   FunctionType *TraceCmpTtTy;
@@ -302,14 +300,6 @@ void AngoraLLVMPass::initVariables(Module &M) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
       // F->addAttribute(LLVM_ATTRIBUTE_LIST::ReturnIndex, Attribute::ZExt);
       // F->addAttribute(1, Attribute::ZExt);
-    }
-
-    Type *InitArgcArgvArgs[2] = {Int32PtrTy, Int8PtrPtrPtrTy};
-    InitArgcArgvTy = FunctionType::get(VoidTy, InitArgcArgvArgs, false);
-    InitArgcArgv = M.getOrInsertFunction("__init_argc_argv", InitArgcArgvTy);
-    if (Function *F = dyn_cast<Function>(InitArgcArgv)) {
-      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
-      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
 
     Type *PrintArgcArgvArgs[2] = {Int32Ty, Int8PtrPtrTy};
