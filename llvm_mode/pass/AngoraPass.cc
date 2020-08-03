@@ -88,7 +88,10 @@ public:
   IntegerType *Int32Ty;
   IntegerType *Int64Ty;
   Type *Int8PtrTy;
+  Type *Int32PtrTy;
   Type *Int64PtrTy;
+  Type *Int8PtrPtrTy;
+  Type *Int8PtrPtrPtrTy;
 
   // Global vars
   GlobalVariable *AngoraMapPtr;
@@ -99,7 +102,8 @@ public:
 
   Constant *TraceCmp;
   Constant *TraceSw;
-  Constant *Hello;
+  Constant *InitArgcArgv;
+  Constant *PrintArgcArgv;
   Constant *TraceCmpTT;
   Constant *TraceSwTT;
   Constant *TraceFnTT;
@@ -107,7 +111,8 @@ public:
 
   FunctionType *TraceCmpTy;
   FunctionType *TraceSwTy;
-  FunctionType *HelloTy;
+  FunctionType *InitArgcArgvTy;
+  FunctionType *PrintArgcArgvTy;
   FunctionType *TraceCmpTtTy;
   FunctionType *TraceSwTtTy;
   FunctionType *TraceFnTtTy;
@@ -243,7 +248,10 @@ void AngoraLLVMPass::initVariables(Module &M) {
   Int32Ty = IntegerType::getInt32Ty(C);
   Int64Ty = IntegerType::getInt64Ty(C);
   Int8PtrTy = PointerType::getUnqual(Int8Ty);
+  Int32PtrTy = PointerType::getUnqual(Int32Ty);
   Int64PtrTy = PointerType::getUnqual(Int64Ty);
+  Int8PtrPtrTy = PointerType::getUnqual(Int8PtrTy);
+  Int8PtrPtrPtrTy = PointerType::getUnqual(Int8PtrPtrTy);
 
   ColdCallWeights = MDBuilder(C).createBranchWeights(1, 1000);
 
@@ -294,9 +302,18 @@ void AngoraLLVMPass::initVariables(Module &M) {
       // F->addAttribute(1, Attribute::ZExt);
     }
 
-    HelloTy = FunctionType::get(VoidTy, NULL, false);
-    Hello = M.getOrInsertFunction("__hello_world", HelloTy);
-    if (Function *F = dyn_cast<Function>(Hello)) {
+    Type *InitArgcArgvArgs[2] = {Int32PtrTy, Int8PtrPtrPtrTy};
+    InitArgcArgvTy = FunctionType::get(VoidTy, InitArgcArgvArgs, false);
+    InitArgcArgv = M.getOrInsertFunction("__init_argc_argv", InitArgcArgvTy);
+    if (Function *F = dyn_cast<Function>(InitArgcArgv)) {
+      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
+      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
+    }
+
+    Type *PrintArgcArgvArgs[2] = {Int32Ty, Int8PtrPtrTy};
+    PrintArgcArgvTy = FunctionType::get(VoidTy, PrintArgcArgvArgs, false);
+    PrintArgcArgv = M.getOrInsertFunction("__print_argc_argv", PrintArgcArgvTy);
+    if (Function *F = dyn_cast<Function>(PrintArgcArgv)) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
@@ -1034,8 +1051,23 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         BasicBlock::iterator IP = BB->getFirstInsertionPt();
         IRBuilder<> IRB(&(*IP));
 
-        CallInst *HelloWorldCall = IRB.CreateCall(Hello, {});
-        setInsNonSan(HelloWorldCall);
+        if (F.arg_size() >= 2) {
+          Function::arg_iterator it = F.arg_begin();
+          Value* argc = &(*it);
+          argc->setName("argc");
+          Value* argv = &(*(++it));
+          argv->setName("argv");
+
+          CallInst *PrintArgcArgvCall = IRB.CreateCall(PrintArgcArgv, {argc, argv});
+          setInsNonSan(PrintArgcArgvCall);
+
+        } else {
+          printf("ERROR! main function arg_size < 2!");
+          exit(1);
+        }
+        
+
+
       }
 
       for (auto inst = BB->begin(); inst != BB->end(); inst++) {
