@@ -99,6 +99,7 @@ public:
 
   Constant *TraceCmp;
   Constant *TraceSw;
+  Constant *Hello;
   Constant *TraceCmpTT;
   Constant *TraceSwTT;
   Constant *TraceFnTT;
@@ -106,6 +107,7 @@ public:
 
   FunctionType *TraceCmpTy;
   FunctionType *TraceSwTy;
+  FunctionType *HelloTy;
   FunctionType *TraceCmpTtTy;
   FunctionType *TraceSwTtTy;
   FunctionType *TraceFnTtTy;
@@ -290,6 +292,13 @@ void AngoraLLVMPass::initVariables(Module &M) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
       // F->addAttribute(LLVM_ATTRIBUTE_LIST::ReturnIndex, Attribute::ZExt);
       // F->addAttribute(1, Attribute::ZExt);
+    }
+
+    HelloTy = FunctionType::get(VoidTy, NULL, false);
+    Hello = M.getOrInsertFunction("__hello_world", HelloTy);
+    if (Function *F = dyn_cast<Function>(Hello)) {
+      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
+      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
 
   } else if (TrackMode) {
@@ -1008,6 +1017,8 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
   for (auto &F : M) {
     if (F.isDeclaration())
       continue;
+    
+    int is_main = F.getName().equals(StringRef("main"));
 
     addFnWrap(F);
     std::vector<BasicBlock *> bb_list;
@@ -1017,6 +1028,15 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     for (auto bi = bb_list.begin(); bi != bb_list.end(); bi++) {
       BasicBlock *BB = *bi;
       std::vector<Instruction *> inst_list;
+      
+      int is_init_block = bi == bb_list.begin();
+      if (is_main && is_init_block) {
+        BasicBlock::iterator IP = BB->getFirstInsertionPt();
+        IRBuilder<> IRB(&(*IP));
+
+        CallInst *HelloWorldCall = IRB.CreateCall(Hello, {});
+        setInsNonSan(HelloWorldCall);
+      }
 
       for (auto inst = BB->begin(); inst != BB->end(); inst++) {
         Instruction *Inst = &(*inst);
