@@ -20,3 +20,21 @@ auto/
 obj-intel64/
 .DS_Store
 llvm_mode/build/
+<<<<<<< HEAD
+=======
+08*
+/out_*/
+/gcov/
+*.gcov
+/0925/
+/run.sh
+/run2.sh
+/run3.sh
+/0920/
+inputs_vuzzer/
+nohup*
+angora_vs.proj.code-workspace
+options/
+OptExtraction/
+runtime_fast/target/
+>>>>>>> a69e752... hello world!

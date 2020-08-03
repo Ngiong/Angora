@@ -11,3 +11,7 @@ void __angora_reset_context() {
   __angora_prev_loc = 0;
   __angora_context = 0;
 }
+
+void __hello_world() {
+  printf("Hello, World!\n");
+}
