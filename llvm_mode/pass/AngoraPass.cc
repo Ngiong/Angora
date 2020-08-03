@@ -99,6 +99,7 @@ public:
   Constant *TraceSw;
   Constant *InitArgcArgv;
   Constant *PrintArgcArgv;
+  Constant *AlterMain;
   Constant *TraceCmpTT;
   Constant *TraceSwTT;
   Constant *TraceFnTT;
@@ -108,6 +109,7 @@ public:
   FunctionType *TraceSwTy;
   FunctionType *InitArgcArgvTy;
   FunctionType *PrintArgcArgvTy;
+  FunctionType *AlterMainTy;
   FunctionType *TraceCmpTtTy;
   FunctionType *TraceSwTtTy;
   FunctionType *TraceFnTtTy;
@@ -315,9 +317,23 @@ void AngoraLLVMPass::initVariables(Module &M) {
     }
 
     Type *PrintArgcArgvArgs[2] = {Int32Ty, Int8PtrPtrTy};
-    PrintArgcArgvTy = FunctionType::get(VoidTy, PrintArgcArgvArgs, false);
+    PrintArgcArgvTy = FunctionType::get(Int32Ty, PrintArgcArgvArgs, false);
     PrintArgcArgv = M.getOrInsertFunction("__print_argc_argv", PrintArgcArgvTy);
     if (Function *F = dyn_cast<Function>(PrintArgcArgv)) {
+      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
+      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
+    }
+
+    for (auto &F : M) {
+      if (F.isDeclaration()) continue;
+      int is_real_main = F.getName().equals(StringRef("main"));
+      if (is_real_main) F.setName("__old_main");
+    }
+
+    Type *AlterMainArgs[2] = {Int32Ty, Int8PtrPtrTy};
+    AlterMainTy = FunctionType::get(Int32Ty, AlterMainArgs, false);
+    AlterMain = M.getOrInsertFunction("main", AlterMainTy);
+    if (Function *F = dyn_cast<Function>(AlterMain)) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
@@ -895,8 +911,6 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
   for (auto &F : M) {
     if (F.isDeclaration() || F.getName().startswith(StringRef("asan.module")))
       continue;
-    
-    int is_main = F.getName().equals(StringRef("main"));
 
     addFnWrap(F);
 
@@ -908,30 +922,6 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
       BasicBlock *BB = *bi;
       std::vector<Instruction *> inst_list;
       
-      int is_init_block = bi == bb_list.begin();
-      if (is_main && is_init_block) {
-        BasicBlock::iterator IP = BB->getFirstInsertionPt();
-        IRBuilder<> IRB(&(*IP));
-
-        if (F.arg_size() >= 2) {
-          Function::arg_iterator it = F.arg_begin();
-          Value* argc = &(*it);
-          argc->setName("argc");
-          Value* argv = &(*(++it));
-          argv->setName("argv");
-
-          CallInst *PrintArgcArgvCall = IRB.CreateCall(PrintArgcArgv, {argc, argv});
-          setInsNonSan(PrintArgcArgvCall);
-
-        } else {
-          printf("ERROR! main function arg_size < 2!");
-          exit(1);
-        }
-        
-
-
-      }
-
       for (auto inst = BB->begin(); inst != BB->end(); inst++) {
         Instruction *Inst = &(*inst);
         inst_list.push_back(Inst);
