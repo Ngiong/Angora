@@ -44,3 +44,4 @@ angora_vs.proj.code-workspace
 options/
 OptExtraction/
 runtime_fast/target/
+fuzzer/target/

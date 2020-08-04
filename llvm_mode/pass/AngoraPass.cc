@@ -1041,6 +1041,8 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
     if (F.isDeclaration())
       continue;
 
+    int is_ignored_function = F.getName().equals(StringRef("main")) || F.getName().equals(StringRef("__print_argc_argv"));
+
     addFnWrap(F);
     std::vector<BasicBlock *> bb_list;
     for (auto bb = F.begin(); bb != F.end(); bb++)
@@ -1061,8 +1063,10 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
           continue;
         if (Inst == &(*BB->getFirstInsertionPt())) {
           if (FastMode || (EntryMode && (entry_ids.find(CurFuncId) != entry_ids.end()))) {
-            countEdge(M, *BB);//execute only in fast mode
-            num_of_block += 1;
+            if (!is_ignored_function) {
+              countEdge(M, *BB);//execute only in fast mode
+              num_of_block += 1;
+            }
           }
         }
         if (isa<CallInst>(Inst)) {
