@@ -20,8 +20,6 @@ auto/
 obj-intel64/
 .DS_Store
 llvm_mode/build/
-<<<<<<< HEAD
-=======
 08*
 /out_*/
 /gcov/
@@ -37,4 +35,5 @@ angora_vs.proj.code-workspace
 options/
 OptExtraction/
 runtime_fast/target/
->>>>>>> a69e752... hello world!
+fuzzer/target/
+subjects/
