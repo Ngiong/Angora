@@ -924,11 +924,8 @@ bool AngoraLLVMPass::runOnModule(Module &M) {
         if (Inst->getMetadata(NoSanMetaId))
           continue;
         if (Inst == &(*BB->getFirstInsertionPt())) {
-          if (FastMode || (EntryMode && (entry_ids.find(CurFuncId) != entry_ids.end()))) {
-            if (!is_ignored_function) {
-              countEdge(M, *BB);//execute only in fast mode
-              num_of_block += 1;
-            }
+          if (!is_ignored_function) {
+            countEdge(M, *BB);//execute only in fast mode
           }
         }
         if (isa<CallInst>(Inst)) {
