@@ -13,11 +13,11 @@ rm -f ${PREFIX}/*.a
 cp target/release/fuzzer ${PREFIX}
 cp target/release/*.a ${PREFIX}/lib
 
-cd llvm_mode
-rm -rf build
-mkdir -p build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_BUILD_TYPE=Release ..
-make # VERBOSE=1 
-make install # VERBOSE=1
+# cd llvm_mode
+# rm -rf build
+# mkdir -p build
+# cd build
+# cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_BUILD_TYPE=Release ..
+# make # VERBOSE=1 
+# make install # VERBOSE=1
 

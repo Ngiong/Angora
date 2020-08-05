@@ -394,10 +394,11 @@ impl Executor {
     }
 
     fn add_program_opts_section(&mut self, program_opts: &Vec<String>, content: &Vec<u8>) -> Vec<u8> {
-        let mut bytes = program_opts.join(" ").into_bytes();
-        bytes.extend(vec![0,0]);
-        bytes.extend(content);
-        bytes
+        let program_opts_bytes = program_opts.join(" ").into_bytes();
+        let mut result = content.clone();
+        result.extend(vec![0,0]);
+        result.extend(program_opts_bytes);
+        result
     }
 
     pub fn random_input_buf(&self) -> Vec<u8> {

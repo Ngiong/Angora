@@ -2,6 +2,8 @@
 #include "stdint.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
+#include <string.h>
 
 // uint32_t __angora_cond_cmpid;
 // void __angora_set_cmpid(uint32_t id) { __angora_cond_cmpid = id; }
@@ -44,43 +46,81 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  int c, prev;
-  int buffer[1000], i = 0, j = 0;
-  int get_opt_state = 1;
+  const int MAXB = 32;
+  int buffer[MAXB], i = 0, c, buffer_full = 0, evicted;
   while ((c = fgetc(raw)) != EOF) {
-    if (get_opt_state) {
-      if (i > 0 && prev == '\0' && c == '\0') {
-        get_opt_state = 0;
-      } else {
-        buffer[i++] = c;
-      }
-    } else {
-      fputc(c, result);
+    if (buffer_full) {
+      evicted = buffer[i];
     }
-    prev = c;
+    buffer[i++] = c;
+    if (i == MAXB) {
+      buffer_full = 1;
+      i = 0;
+    }
+    if (buffer_full) {
+      fputc(evicted, result);
+    }
   }
+
+  int *arranged_buffer;
+  int tmp_buffer[MAXB], j = 0, ii, tail;
+  if (buffer_full) {
+    ii = i;
+    while (ii < MAXB) {
+      tmp_buffer[j++] = buffer[ii];
+      ii++;
+    }
+    ii = 0;
+    while (ii < i) {
+      tmp_buffer[j++] = buffer[ii];
+      ii++;
+    }
+    assert(j == MAXB);
+    arranged_buffer = tmp_buffer;
+    tail = MAXB;
+
+  } else {
+    arranged_buffer = buffer;
+    tail = i;
+  }
+
+  // Find last occurence of double \0
+  j = tail - 2;
+  while (j >= 0) {
+    if (arranged_buffer[j] == '\0' && arranged_buffer[j + 1] == '\0') break;
+    j--;
+  }
+  // Write the rest
+  for (ii = 0; ii < j; ii++) {
+    fputc(arranged_buffer[ii], result);
+  }
+  j += 2;
+  // Shift bytes into buffer's head
+  for (ii = 0; j < tail; j++, ii++) {
+    arranged_buffer[ii] = arranged_buffer[j];
+  }
+  arranged_buffer[ii] = '\0';
 
   fclose(raw);
   fclose(result);
 
-  unsigned char uc_buffer[1000];
-  int len = i;
-  for (i = 0; i < len; i++) {
-    uc_buffer[i] = buffer[i];
+  tail = ii;
+  unsigned char uc_buffer[MAXB];
+  for (i = 0; i < tail; i++) {
+    uc_buffer[i] = arranged_buffer[i];
   }
 
   // count how many opt in the buffer
   i = 0;
   int in_flag = 1, count_opt = 0;
   int new_argc = 0;
-  char *new_argv[1000];
+  char *new_argv[MAXB];
   new_argv[new_argc++] = argv[0];
 
-  // make sure we start in_flag (non-whitespace character)
-  while (uc_buffer[i] == ' ') i++;
+  while (uc_buffer[i] == ' ') i++; // seek first non-whitespace char
   new_argv[new_argc++] = uc_buffer + i;
   
-  for (; i < len; i++) {
+  for (; i < tail; i++) {
     int is_delimiter = uc_buffer[i] == ' ' || uc_buffer[i] == '\0';
     if (in_flag == 1) {
       if (is_delimiter) {
