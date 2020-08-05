@@ -392,9 +392,8 @@ impl Executor {
     }
 
     fn add_program_opts_section(&mut self, program_opts: &Vec<String>, content: &Vec<u8>) -> Vec<u8> {
-        let joined = program_opts.join(" ");
-        let program_opts_section = format!("{}\0\0", joined);
-        let mut bytes = program_opts_section.into_bytes();
+        let mut bytes = program_opts.join(" ").into_bytes();
+        bytes.extend(vec![0,0]);
         bytes.extend(content);
         bytes
     }
