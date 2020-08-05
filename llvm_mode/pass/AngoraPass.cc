@@ -306,28 +306,6 @@ void AngoraLLVMPass::initVariables(Module &M) {
       // F->addAttribute(1, Attribute::ZExt);
     }
 
-    Type *PrintArgcArgvArgs[2] = {Int32Ty, Int8PtrPtrTy};
-    PrintArgcArgvTy = FunctionType::get(Int32Ty, PrintArgcArgvArgs, false);
-    PrintArgcArgv = M.getOrInsertFunction("__print_argc_argv", PrintArgcArgvTy);
-    if (Function *F = dyn_cast<Function>(PrintArgcArgv)) {
-      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
-      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
-    }
-
-    for (auto &F : M) {
-      if (F.isDeclaration()) continue;
-      int is_real_main = F.getName().equals(StringRef("main"));
-      if (is_real_main) F.setName("__old_main");
-    }
-
-    Type *AlterMainArgs[2] = {Int32Ty, Int8PtrPtrTy};
-    AlterMainTy = FunctionType::get(Int32Ty, AlterMainArgs, false);
-    AlterMain = M.getOrInsertFunction("main", AlterMainTy);
-    if (Function *F = dyn_cast<Function>(AlterMain)) {
-      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
-      F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
-    }
-
   } else if (TrackMode) {
     Type *TraceCmpTtArgs[7] = {Int32Ty, Int32Ty, Int32Ty, Int32Ty,
                                Int64Ty, Int64Ty, Int32Ty};
@@ -363,6 +341,28 @@ void AngoraLLVMPass::initVariables(Module &M) {
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
       F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
     }
+  }
+
+  for (auto &F : M) {
+    if (F.isDeclaration()) continue;
+    int is_real_main = F.getName().equals(StringRef("main"));
+    if (is_real_main) F.setName("__old_main");
+  }
+
+  Type *PrintArgcArgvArgs[2] = {Int32Ty, Int8PtrPtrTy};
+  PrintArgcArgvTy = FunctionType::get(Int32Ty, PrintArgcArgvArgs, false);
+  PrintArgcArgv = M.getOrInsertFunction("__print_argc_argv", PrintArgcArgvTy);
+  if (Function *F = dyn_cast<Function>(PrintArgcArgv)) {
+    F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
+    F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
+  }
+
+  Type *AlterMainArgs[2] = {Int32Ty, Int8PtrPtrTy};
+  AlterMainTy = FunctionType::get(Int32Ty, AlterMainArgs, false);
+  AlterMain = M.getOrInsertFunction("main", AlterMainTy);
+  if (Function *F = dyn_cast<Function>(AlterMain)) {
+    F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::NoUnwind);
+    F->addAttribute(LLVM_ATTRIBUTE_LIST::FunctionIndex, Attribute::ReadNone);
   }
 
   std::vector<std::string> AllABIListFiles;

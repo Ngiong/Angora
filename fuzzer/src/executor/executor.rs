@@ -196,7 +196,7 @@ impl Executor {
         (status, output)
     }
 
-    fn try_unlimited_memory(&mut self, buf: &Vec<u8>, cmpid: u32) -> bool {
+    fn try_unlimited_memory(&mut self, buf: &Vec<u8>, cmpid: u32, program_opts: &Vec<String>) -> bool {
         let mut skip = false;
         self.branches.clear_trace();
         if self.cmd.is_stdin {
@@ -216,6 +216,7 @@ impl Executor {
             );
             // crash or hang
             if self.branches.has_new(unmem_status).0 {
+                let buf = self.add_program_opts_section(program_opts, buf);
                 self.depot.save(unmem_status, &buf, cmpid);
             }
         }
@@ -236,6 +237,7 @@ impl Executor {
         if has_new_path {
             self.has_new_path = true;
             self.local_stats.find_new(&status);
+            let buf = &self.add_program_opts_section(program_opts, buf);
             let id = self.depot.save(status, &buf, cmpid);
 
             if status == StatusType::Normal {
@@ -252,7 +254,7 @@ impl Executor {
                     );
                     return;
                 }
-                let crash_or_tmout = self.try_unlimited_memory(buf, cmpid);
+                let crash_or_tmout = self.try_unlimited_memory(buf, cmpid, program_opts);
                 if !crash_or_tmout {
                     let cond_stmts = self.track(id, buf, speed, program_opts);
                     if cond_stmts.len() > 0 {
@@ -314,8 +316,8 @@ impl Executor {
     }
 
     fn run_inner(&mut self, buf: &Vec<u8>, program_opts: &Vec<String>) -> StatusType {
-        let new_buf = self.add_program_opts_section(program_opts, buf);
-        self.write_test(&new_buf);
+        let buf = self.add_program_opts_section(program_opts, buf);
+        self.write_test(&buf);
 
         self.branches.clear_trace();
 
@@ -359,8 +361,8 @@ impl Executor {
 
         let t_now: stats::TimeIns = Default::default();
 
-        let new_buf = self.add_program_opts_section(program_opts, buf);
-        self.write_test(&new_buf);
+        let buf = self.add_program_opts_section(program_opts, buf);
+        self.write_test(&buf);
 
         compiler_fence(Ordering::SeqCst);
         let ret_status = self.run_target(
