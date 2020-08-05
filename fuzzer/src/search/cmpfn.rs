@@ -2,11 +2,15 @@ use super::*;
 use angora_common::tag::TagSeg;
 pub struct FnFuzz<'a> {
     handler: SearchHandler<'a>,
+    program_opts: Vec<String>,
 }
 
 impl<'a> FnFuzz<'a> {
-    pub fn new(handler: SearchHandler<'a>) -> Self {
-        Self { handler }
+    pub fn new(handler: SearchHandler<'a>, program_opts: &Vec<String>) -> Self {
+        Self {
+            handler,
+            program_opts: program_opts.clone(),
+        }
     }
 
     fn insert_bytes(&mut self, n: usize) {
@@ -75,7 +79,7 @@ impl<'a> FnFuzz<'a> {
         }
 
         input.assign(&self.handler.cond.variables);
-        self.handler.execute_input(&input);
+        self.handler.execute_input(&input, &self.program_opts);
 
         self.handler.cond.mark_as_done();
     }

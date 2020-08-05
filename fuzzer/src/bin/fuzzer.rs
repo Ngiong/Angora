@@ -79,6 +79,12 @@ fn main() {
              .short("E")
              .long("disable_exploitation")
              .help("Disable the fuzzer to mutate sensitive bytes to exploit bugs"))
+        .arg(Arg::with_name("program_option")
+             .short("O")
+             .long("program_option")
+             .value_name("FILE")
+             .help("input option txt file")
+             .takes_value(true))
        .get_matches();
 
     fuzz_main(
@@ -94,5 +100,6 @@ fn main() {
         matches.occurrences_of("sync_afl") > 0,
         matches.occurrences_of("disable_afl_mutation") == 0,
         matches.occurrences_of("disable_exploitation") == 0,
+        matches.value_of("program_option"),
     );
 }

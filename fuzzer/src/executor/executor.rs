@@ -173,10 +173,11 @@ impl Executor {
         &mut self,
         buf: &Vec<u8>,
         cond: &mut cond_stmt::CondStmt,
+        program_opts: &Vec<String>,
     ) -> (StatusType, u64) {
         self.run_init();
         self.t_conds.set(cond);
-        let mut status = self.run_inner(buf);
+        let mut status = self.run_inner(buf, program_opts);
 
         let output = self.t_conds.get_cond_output();
         let mut explored = false;
@@ -185,7 +186,7 @@ impl Executor {
         skip |= self.check_invariable(output, cond);
         self.check_consistent(output, cond);
 
-        self.do_if_has_new(buf, status, explored, cond.base.cmpid);
+        self.do_if_has_new(buf, status, explored, cond.base.cmpid, program_opts);
         status = self.check_timeout(status, cond);
 
         if skip {
@@ -221,7 +222,14 @@ impl Executor {
         skip
     }
 
-    fn do_if_has_new(&mut self, buf: &Vec<u8>, status: StatusType, _explored: bool, cmpid: u32) {
+    fn do_if_has_new(
+        &mut self,
+        buf: &Vec<u8>,
+        status: StatusType,
+        _explored: bool,
+        cmpid: u32,
+        program_opts: &Vec<String>,
+    ) {
         // new edge: one byte in bitmap
         let (has_new_path, has_new_edge, edge_num) = self.branches.has_new(status);
 
@@ -246,7 +254,7 @@ impl Executor {
                 }
                 let crash_or_tmout = self.try_unlimited_memory(buf, cmpid);
                 if !crash_or_tmout {
-                    let cond_stmts = self.track(id, buf, speed);
+                    let cond_stmts = self.track(id, buf, speed, program_opts);
                     if cond_stmts.len() > 0 {
                         self.depot.add_entries(cond_stmts);
                         if self.cmd.enable_afl {
@@ -261,17 +269,22 @@ impl Executor {
         }
     }
 
-    pub fn run(&mut self, buf: &Vec<u8>, cond: &mut cond_stmt::CondStmt) -> StatusType {
+    pub fn run(
+        &mut self,
+        buf: &Vec<u8>,
+        cond: &mut cond_stmt::CondStmt,
+        program_opts: &Vec<String>,
+    ) -> StatusType {
         self.run_init();
-        let status = self.run_inner(buf);
-        self.do_if_has_new(buf, status, false, 0);
+        let status = self.run_inner(buf, program_opts);
+        self.do_if_has_new(buf, status, false, 0, program_opts);
         self.check_timeout(status, cond)
     }
 
-    pub fn run_sync(&mut self, buf: &Vec<u8>) {
+    pub fn run_sync(&mut self, buf: &Vec<u8>, program_opts: &Vec<String>) {
         self.run_init();
-        let status = self.run_inner(buf);
-        self.do_if_has_new(buf, status, false, 0);
+        let status = self.run_inner(buf, program_opts);
+        self.do_if_has_new(buf, status, false, 0, program_opts);
     }
 
     fn run_init(&mut self) {
@@ -300,8 +313,9 @@ impl Executor {
         ret_status
     }
 
-    fn run_inner(&mut self, buf: &Vec<u8>) -> StatusType {
-        self.write_test(buf);
+    fn run_inner(&mut self, buf: &Vec<u8>, program_opts: &Vec<String>) -> StatusType {
+        let new_buf = self.add_program_opts_section(program_opts, buf);
+        self.write_test(&new_buf);
 
         self.branches.clear_trace();
 
@@ -337,7 +351,7 @@ impl Executor {
         used_us / 3
     }
 
-    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32) -> Vec<cond_stmt::CondStmt> {
+    fn track(&mut self, id: usize, buf: &Vec<u8>, speed: u32, program_opts: &Vec<String>) -> Vec<cond_stmt::CondStmt> {
         self.envs.insert(
             defs::TRACK_OUTPUT_VAR.to_string(),
             self.cmd.track_path.clone(),
@@ -345,7 +359,8 @@ impl Executor {
 
         let t_now: stats::TimeIns = Default::default();
 
-        self.write_test(buf);
+        let new_buf = self.add_program_opts_section(program_opts, buf);
+        self.write_test(&new_buf);
 
         compiler_fence(Ordering::SeqCst);
         let ret_status = self.run_target(
@@ -374,6 +389,14 @@ impl Executor {
 
         self.local_stats.track_time += t_now.into();
         cond_list
+    }
+
+    fn add_program_opts_section(&mut self, program_opts: &Vec<String>, content: &Vec<u8>) -> Vec<u8> {
+        let joined = program_opts.join(" ");
+        let program_opts_section = format!("{}\0\0", joined);
+        let mut bytes = program_opts_section.into_bytes();
+        bytes.extend(content);
+        bytes
     }
 
     pub fn random_input_buf(&self) -> Vec<u8> {

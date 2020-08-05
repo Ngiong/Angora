@@ -2,27 +2,31 @@ use super::*;
 
 pub struct OneByteFuzz<'a> {
     pub handler: SearchHandler<'a>,
+    program_opts: Vec<String>,
 }
 
 impl<'a> OneByteFuzz<'a> {
-    pub fn new(handler: SearchHandler<'a>) -> Self {
-        Self { handler }
+    pub fn new(handler: SearchHandler<'a>, program_opts: &Vec<String>) -> Self {
+        Self {
+            handler,
+            program_opts: program_opts.clone(),
+        }
     }
 
     fn execute(&mut self, input: &MutInput) {
         debug!("input : {:?}", input);
         if self.handler.cond.base.is_explore() {
-            self.handler.execute_cond(input);
+            self.handler.execute_cond(input, &self.program_opts);
         } else {
-            self.handler.execute_input(input);
+            self.handler.execute_input(input, &self.program_opts);
         }
     }
 
     fn execute_direct(&mut self) {
         if self.handler.cond.base.is_explore() {
-            self.handler.execute_cond_direct();
+            self.handler.execute_cond_direct(&self.program_opts);
         } else {
-            self.handler.execute_input_direct();
+            self.handler.execute_input_direct(&self.program_opts);
         }
     }
     pub fn run(&mut self) {

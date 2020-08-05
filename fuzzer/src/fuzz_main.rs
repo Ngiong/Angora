@@ -1,17 +1,10 @@
 use crate::stats::*;
 use angora_common::defs;
 use chrono::prelude::Local;
-use std::{
-    collections::HashMap,
-    fs,
-    io::prelude::*,
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, RwLock,
-    },
-    thread, time,
-};
+use std::{collections::HashMap, fs, io::prelude::*, path::{Path, PathBuf}, sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc, RwLock,
+}, thread, time, io};
 
 use crate::{bind_cpu, branches, check_dep, command, depot, executor, fuzz_loop, stats};
 use ctrlc;
@@ -31,8 +24,10 @@ pub fn fuzz_main(
     sync_afl: bool,
     enable_afl: bool,
     enable_exploitation: bool,
+    program_option_file: Option<&str>,
 ) {
     pretty_env_logger::init();
+    let _option_vec = parse_program_option_file(program_option_file);
 
     let (seeds_dir, angora_out_dir) = initialize_directories(in_dir, out_dir, sync_afl);
     let command_option = command::CommandOpt::new(
@@ -256,4 +251,25 @@ fn main_thread_sync_and_log(
             }
         }
     }
+}
+
+fn parse_program_option_file(file: Option<&str>) -> Vec<String> {
+    if file.is_none() {
+        return Vec::new();
+    }
+
+    let mut options = vec![];
+    let file = fs::File::open(file.unwrap()).unwrap();
+    for line in io::BufReader::new(file).lines() {
+        match line {
+            Ok(mut line) => {
+                if line.len() != 0 {
+                    line.retain(|c| c != '\n');
+                    options.push(line);
+                }
+            },
+            _ => {break; }
+        }
+    }
+    options
 }

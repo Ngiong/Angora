@@ -4,11 +4,15 @@ use crate::cond_stmt::CondOutput;
 
 pub struct LenFuzz<'a> {
     handler: SearchHandler<'a>,
+    program_opts: Vec<String>,
 }
 
 impl<'a> LenFuzz<'a> {
-    pub fn new(handler: SearchHandler<'a>) -> Self {
-        Self { handler }
+    pub fn new(handler: SearchHandler<'a>, program_opts: &Vec<String>) -> Self {
+        Self {
+            handler,
+            program_opts: program_opts.clone(),
+        }
     }
 
     pub fn run(&mut self) {
@@ -41,26 +45,26 @@ impl<'a> LenFuzz<'a> {
                     let mut v = vec![0u8; extended_len + 1];
                     rand::thread_rng().fill_bytes(&mut v);
                     buf.append(&mut v);
-                    self.handler.execute(&buf);
+                    self.handler.execute(&buf, &self.program_opts);
                     // some special chars: NULL, LF, CR, SPACE
                     let special_chars = vec![0, 10, 13, 32];
                     for c in special_chars {
                         buf.push(c);
-                        self.handler.execute(&buf);
+                        self.handler.execute(&buf, &self.program_opts);
                         buf.pop();
                     }
                     // len == X
                     buf.pop();
-                    self.handler.execute(&buf);
+                    self.handler.execute(&buf, &self.program_opts);
                 }
                 if buf_len > extended_len {
                     buf.truncate(buf_len - extended_len);
                     // len == X
-                    self.handler.execute(&buf);
+                    self.handler.execute(&buf, &self.program_opts);
                     // len < X
                     if buf_len > extended_len + 1 {
                         buf.pop();
-                        self.handler.execute(&buf);
+                        self.handler.execute(&buf, &self.program_opts);
                     }
                 }
             }

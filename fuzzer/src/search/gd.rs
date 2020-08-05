@@ -8,13 +8,15 @@ use std;
 pub struct GdSearch<'a> {
     handler: SearchHandler<'a>,
     sample_index: (usize, usize),
+    program_opts: Vec<String>,
 }
 
 impl<'a> GdSearch<'a> {
-    pub fn new(handler: SearchHandler<'a>) -> Self {
+    pub fn new(handler: SearchHandler<'a>, program_opts: &Vec<String>) -> Self {
         Self {
             handler,
             sample_index: (0, 0),
+            program_opts: program_opts.clone(),
         }
     }
 
@@ -23,7 +25,7 @@ impl<'a> GdSearch<'a> {
             return self.handler.executor.last_f;
         }
         debug!("input : {:?}", input);
-        let f = self.handler.execute_cond(input);
+        let f = self.handler.execute_cond(input, &self.program_opts);
         f
     }
 
@@ -120,7 +122,7 @@ impl<'a> GdSearch<'a> {
     fn init_start_point(&mut self, input_min: &mut MutInput) -> u64 {
         debug!("Init start...");
         let mut input = input_min.clone();
-        let mut fmin = self.handler.execute_cond_direct();
+        let mut fmin = self.handler.execute_cond_direct(&self.program_opts);
 
         input.assign(&self.handler.cond.variables);
         let f1 = self.execute(&input);

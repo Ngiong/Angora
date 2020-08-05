@@ -54,33 +54,33 @@ impl<'a> SearchHandler<'a> {
         }
     }
 
-    pub fn execute(&mut self, buf: &Vec<u8>) {
-        let status = self.executor.run(buf, self.cond);
+    pub fn execute(&mut self, buf: &Vec<u8>, program_opts: &Vec<String>) {
+        let status = self.executor.run(buf, self.cond, program_opts);
         self.process_status(status);
     }
 
-    pub fn execute_input(&mut self, input: &MutInput) {
+    pub fn execute_input(&mut self, input: &MutInput, program_opts: &Vec<String>) {
         input.write_to_input(&self.cond.offsets, &mut self.buf);
-        let status = self.executor.run(&self.buf, self.cond);
+        let status = self.executor.run(&self.buf, self.cond, program_opts);
         self.process_status(status);
     }
 
-    pub fn execute_cond(&mut self, input: &MutInput) -> u64 {
+    pub fn execute_cond(&mut self, input: &MutInput, program_opts: &Vec<String>) -> u64 {
         input.write_to_input(&self.cond.offsets, &mut self.buf);
-        let (status, f_output) = self.executor.run_with_cond(&self.buf, self.cond);
+        let (status, f_output) = self.executor.run_with_cond(&self.buf, self.cond, program_opts);
         self.process_status(status);
         // output will be u64::MAX if unreachable, including timeout and crash
         f_output
     }
 
-    pub fn execute_cond_direct(&mut self) -> u64 {
-        let (status, f_output) = self.executor.run_with_cond(&self.buf, self.cond);
+    pub fn execute_cond_direct(&mut self, program_opts: &Vec<String>) -> u64 {
+        let (status, f_output) = self.executor.run_with_cond(&self.buf, self.cond, program_opts);
         self.process_status(status);
         f_output
     }
 
-    pub fn execute_input_direct(&mut self) {
-        let status = self.executor.run(&self.buf, self.cond);
+    pub fn execute_input_direct(&mut self, program_opts: &Vec<String>) {
+        let status = self.executor.run(&self.buf, self.cond, program_opts);
         self.process_status(status);
     }
 

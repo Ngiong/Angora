@@ -2,11 +2,15 @@ use super::*;
 
 pub struct RandomSearch<'a> {
     handler: SearchHandler<'a>,
+    program_opts: Vec<String>,
 }
 
 impl<'a> RandomSearch<'a> {
-    pub fn new(handler: SearchHandler<'a>) -> Self {
-        Self { handler }
+    pub fn new(handler: SearchHandler<'a>, program_opts: &Vec<String>) -> Self {
+        Self {
+            handler,
+            program_opts: program_opts.clone(),
+        }
     }
 
     pub fn run(&mut self) {
@@ -18,7 +22,7 @@ impl<'a> RandomSearch<'a> {
             }
             input.assign(&orig_input_val);
             input.randomize_all();
-            self.handler.execute_cond(&input);
+            self.handler.execute_cond(&input, &self.program_opts);
         }
     }
 }

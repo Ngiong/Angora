@@ -11,10 +11,11 @@ static IDX_TO_SIZE: [usize; 4] = [1, 2, 4, 8];
 pub struct AFLFuzz<'a> {
     handler: SearchHandler<'a>,
     run_ratio: usize,
+    program_opts: Vec<String>,
 }
 
 impl<'a> AFLFuzz<'a> {
-    pub fn new(handler: SearchHandler<'a>) -> Self {
+    pub fn new(handler: SearchHandler<'a>, program_opts: &Vec<String>) -> Self {
         // FIXME:
         let edge_num = handler.cond.base.arg1 as usize;
         let avg_edge_num = handler.executor.local_stats.avg_edge_num.get() as usize;
@@ -26,7 +27,7 @@ impl<'a> AFLFuzz<'a> {
             5
         };
 
-        Self { handler, run_ratio }
+        Self { handler, run_ratio, program_opts: program_opts.clone() }
     }
 
     pub fn run(&mut self) {
@@ -66,7 +67,7 @@ impl<'a> AFLFuzz<'a> {
             }
             let mut buf = self.handler.buf.clone();
             self.havoc_flip(&mut buf, max_stacking, choice_range);
-            self.handler.execute(&buf);
+            self.handler.execute(&buf, &self.program_opts);
         }
     }
 
@@ -110,7 +111,7 @@ impl<'a> AFLFuzz<'a> {
         let buf1 = self.handler.buf.clone();
         let buf2 = self.handler.executor.random_input_buf();
         if let Some(new_buf) = Self::splice_two_vec(&buf1, &buf2) {
-            self.handler.execute(&new_buf);
+            self.handler.execute(&new_buf, &self.program_opts);
             true
         } else {
             false
@@ -212,7 +213,7 @@ impl<'a> AFLFuzz<'a> {
             rng.fill_bytes(&mut v);
             buf.append(&mut v);
             if buf.len() < config::MAX_INPUT_LEN {
-                self.handler.execute(&buf);
+                self.handler.execute(&buf, &self.program_opts);
             } else {
                 break;
             }
@@ -234,7 +235,7 @@ impl<'a> AFLFuzz<'a> {
             buf.append(&mut v);
             step = step * 2;
             if buf.len() < config::MAX_INPUT_LEN {
-                self.handler.execute(&buf);
+                self.handler.execute(&buf, &self.program_opts);
             } else {
                 break;
             }
