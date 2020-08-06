@@ -16,6 +16,8 @@ void __angora_reset_context() {
   __angora_context = 0;
 }
 
+int __old_main(int, char**);
+
 int __print_argc_argv(int argc, char *argv[]) {
   printf("Your argc: %d\n", argc);
   for (int i = 0; i < argc; i++) {
@@ -46,19 +48,17 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  const int MAXB = 32;
+  const int MAXB = 2048;
   int buffer[MAXB], i = 0, c, buffer_full = 0, evicted;
   while ((c = fgetc(raw)) != EOF) {
     if (buffer_full) {
       evicted = buffer[i];
+      fputc(evicted, result);
     }
     buffer[i++] = c;
     if (i == MAXB) {
       buffer_full = 1;
       i = 0;
-    }
-    if (buffer_full) {
-      fputc(evicted, result);
     }
   }
 

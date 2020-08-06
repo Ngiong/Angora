@@ -123,25 +123,23 @@ pub fn fuzz_loop(
 }
 
 pub fn parse_buf(buf: &Vec<u8>) -> (Vec<String>, Vec<u8>) {
-    let mut opt = Vec::new();
-    let mut content = Vec::new();
-    let mut is_content_state = false;
-    for (idx, dbuf) in buf.iter().enumerate() {
-        let dbuf = *dbuf;
-        if is_content_state {
-            content.push(dbuf);
-        } else {
-            if idx > 0 && dbuf == 0 && buf[idx - 1] == 0 {
-                is_content_state = true;
-                continue;
-            } else if dbuf == 0 && buf[idx + 1] == 0 {
-                continue;
-            }
-            opt.push(dbuf);
+    let mut idx = buf.len() - 2;
+    while idx > 0 {
+        if buf[idx] == 0 && buf[idx+1] == 0 {
+            break;
         }
+        idx -= 1;
     }
 
-    let program_opts = match String::from_utf8(opt) {
+    if buf[idx] == 0 && buf[idx+1] == 0 {
+        warn!("Unknown formatted file! Check the implementation :)");
+        return (vec![], buf.clone());
+    }
+
+    let content = Vec::from(&buf[..idx]);
+    let opts = Vec::from(&buf[idx+2..]);
+
+    let program_opts = match String::from_utf8(opts) {
         Ok(raw_opt) => {
             let mut result = Vec::new();
             for i in raw_opt.split_whitespace() {
@@ -151,7 +149,7 @@ pub fn parse_buf(buf: &Vec<u8>) -> (Vec<String>, Vec<u8>) {
         },
         Err(_) => {
             warn!("Unable to parse program options from buf (fuzz_loop.rs::parse_buf)");
-            Vec::new()
+            return (vec![], buf.clone());
         },
     };
     (program_opts, content)
