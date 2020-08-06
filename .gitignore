@@ -37,3 +37,4 @@ OptExtraction/
 runtime_fast/target/
 fuzzer/target/
 subjects/
+.idea/
