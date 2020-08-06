@@ -132,6 +132,8 @@ pub fn parse_buf(buf: &Vec<u8>) -> (Vec<String>, Vec<u8>) {
     }
 
     if buf[idx] == 0 && buf[idx+1] == 0 {
+        // do nothing
+    } else {
         warn!("Unknown formatted file! Check the implementation :)");
         return (vec![], buf.clone());
     }
