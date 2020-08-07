@@ -16,7 +16,7 @@ void __angora_reset_context() {
   __angora_context = 0;
 }
 
-int dfs$__old_main(int, char**);
+int dfs$__old_main(int, char **);
 
 int __print_argc_argv(int argc, char *argv[]) {
   printf("Your argc: %d\n", argc);
@@ -117,25 +117,27 @@ int main(int argc, char *argv[]) {
   char *new_argv[MAXB];
   new_argv[new_argc++] = argv[0];
 
-  while (uc_buffer[i] == ' ') i++; // seek first non-whitespace char
-  new_argv[new_argc++] = uc_buffer + i;
-  
-  for (; i < tail; i++) {
-    int is_delimiter = uc_buffer[i] == ' ' || uc_buffer[i] == '\0';
-    if (in_flag == 1) {
-      if (is_delimiter) {
-        uc_buffer[i] = '\0';
-        in_flag = 0;
-        count_opt++;
+  if (tail > 0) {
+    while (uc_buffer[i] == ' ') i++; // seek first non-whitespace char
+    new_argv[new_argc++] = uc_buffer + i;
+
+    for (; i < tail; i++) {
+      int is_delimiter = uc_buffer[i] == ' ' || uc_buffer[i] == '\0';
+      if (in_flag == 1) {
+        if (is_delimiter) {
+          uc_buffer[i] = '\0';
+          in_flag = 0;
+          count_opt++;
+        } else {
+          // do nothing
+        }
       } else {
-        // do nothing
-      }
-    } else {
-      if (!is_delimiter) {
-        new_argv[new_argc++] = uc_buffer + i;
-        in_flag = 1;
-      } else {
-        // do nothing
+        if (!is_delimiter) {
+          new_argv[new_argc++] = uc_buffer + i;
+          in_flag = 1;
+        } else {
+          // do nothing
+        }
       }
     }
   }
