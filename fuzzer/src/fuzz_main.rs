@@ -225,6 +225,8 @@ fn main_thread_sync_and_log(
     if sync_afl {
         depot::sync_afl(executor, running.clone(), sync_dir, &mut synced_ids);
     }
+    if let Err(_) = writeln!(log_file, "time,density,queue,hang,crash") {
+      eprintln!("can't write angora.log"); }
     let mut sync_counter = 1;
     show_stats(&mut log_file, depot, global_branches, stats);
     while running.load(Ordering::SeqCst) {
