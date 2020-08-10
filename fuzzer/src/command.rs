@@ -95,6 +95,10 @@ impl CommandOpt {
         );
 
         let mut tmp_args = pargs.clone();
+        let mut tmp_args: Vec<String> = tmp_args.iter()
+            .filter(|&s| s.ne("@@"))
+            .cloned()
+            .collect();
         let main_bin = tmp_args[0].clone();
         let main_args: Vec<String> = tmp_args.drain(1..).collect();
         let uses_asan = check_dep::check_asan(&main_bin);
