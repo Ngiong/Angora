@@ -67,8 +67,39 @@ impl<'a> AFLFuzz<'a> {
             }
             let mut buf = self.handler.buf.clone();
             self.havoc_flip(&mut buf, max_stacking, choice_range);
-            self.handler.execute(&buf, &self.program_opts);
+
+            let mutated_program_opts = self.mutate_prog_opt(max_stacking, choice_range);
+            self.handler.execute(&buf, &mutated_program_opts);
         }
+    }
+
+    fn mutate_prog_opt(
+        &mut self,
+        max_stacking: usize,
+        choice_range: Uniform<u32>
+    ) -> Vec<String> {
+        let mut rng = rand::thread_rng();
+        let program_opts = &self.program_opts;
+        let should_mutate = rng.gen_bool(config::MUTATE_PROGRAM_OPT_CHANCE);
+        if !should_mutate {
+            return program_opts.clone();
+        }
+
+        let result = if config::MUTATE_PROGRAM_OPT_USING_GRAMMAR { // grammar-based mutation
+            program_opts.clone() // TODO: implement grammar-based mutation
+
+        } else { // byte mutation
+            let mut program_opts_bytes: Vec<u8> = program_opts.join(" ").into_bytes();
+            self.havoc_flip(&mut program_opts_bytes, max_stacking, choice_range);
+            match String::from_utf8(program_opts_bytes) {
+                Ok(str) => vec![str],
+                Err(_) => {
+                    warn!("Unable to parse program options after AFL mutation (afl::random_program_opts_mutation)");
+                    program_opts.clone()
+                },
+            }
+        };
+        result
     }
 
     fn locate_diffs(buf1: &Vec<u8>, buf2: &Vec<u8>, len: usize) -> (Option<usize>, Option<usize>) {
