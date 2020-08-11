@@ -1,5 +1,5 @@
 use crate::stats::*;
-use angora_common::defs;
+use angora_common::{defs, config};
 use chrono::prelude::Local;
 use std::{collections::HashMap, fs, io::prelude::*, path::{Path, PathBuf}, sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -257,6 +257,10 @@ fn main_thread_sync_and_log(
 }
 
 fn parse_program_option_file(file: Option<&str>) -> Vec<String> {
+    if file.is_none() && config::MUTATE_PROGRAM_OPT_USING_GRAMMAR {
+        panic!("You must provide the option file (-O <file>) to use Grammar-based program options fuzzing");
+    }
+
     if file.is_none() {
         return Vec::new();
     }
