@@ -5,6 +5,7 @@
 
 use super::*;
 use rand::{self, distributions::Uniform, Rng};
+use std::collections::HashSet;
 
 static IDX_TO_SIZE: [usize; 4] = [1, 2, 4, 8];
 
@@ -86,7 +87,7 @@ impl<'a> AFLFuzz<'a> {
         }
 
         let result = if config::MUTATE_PROGRAM_OPT_USING_GRAMMAR { // grammar-based mutation
-            program_opts.clone() // TODO: implement grammar-based mutation
+            self.grammar_based_program_opt_mutation()
 
         } else { // byte mutation
             let mut program_opts_bytes: Vec<u8> = program_opts.join(" ").into_bytes();
@@ -100,6 +101,34 @@ impl<'a> AFLFuzz<'a> {
             }
         };
         result
+    }
+
+    fn grammar_based_program_opt_mutation(
+        &mut self,
+    ) -> Vec<String> {
+        let mut rng = rand::thread_rng();
+        let program_opts = &self.program_opts;
+        let program_opts_dict = &self.handler.executor.cmd.option_vec;
+
+        let po_sample_size = rng.gen_range(0, program_opts.len());
+        let po_sample = program_opts.iter().choose_multiple(&mut rng, po_sample_size);
+
+        let dict_sample_size = rng.gen_range(0, program_opts_dict.len());
+        let dict_sample = program_opts_dict.iter().choose_multiple(&mut rng, dict_sample_size);
+
+        let mut deduplicate_set = HashSet::new();
+        for i in po_sample {
+            deduplicate_set.insert(i);
+        }
+        for i in dict_sample {
+            deduplicate_set.insert(i);
+        }
+
+        let final_program_opt_size = rng.gen_range(0, deduplicate_set.len());
+        let final_program_opt = deduplicate_set.iter().choose_multiple(&mut rng, final_program_opt_size);
+        final_program_opt.iter()
+            .map(|&&s| s.clone())
+            .collect()
     }
 
     fn locate_diffs(buf1: &Vec<u8>, buf2: &Vec<u8>, len: usize) -> (Option<usize>, Option<usize>) {
