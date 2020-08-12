@@ -121,11 +121,13 @@ impl<'a> AFLFuzz<'a> {
             deduplicate_set.insert(i);
         }
 
-        let final_program_opt_size = rng.gen_range(0, deduplicate_set.len());
+        let final_program_opt_size = rng.gen_range(0, config::GRAMMAR_BASED_MAX_PROG_OPTS);
         let final_program_opt = deduplicate_set.iter().choose_multiple(&mut rng, final_program_opt_size);
-        final_program_opt.iter()
+        let mut final_program_opt: Vec<String> = final_program_opt.iter()
             .map(|&&s| s.clone())
-            .collect()
+            .collect();
+        final_program_opt.shuffle(&mut rng);
+        final_program_opt
     }
 
     fn locate_diffs(buf1: &Vec<u8>, buf2: &Vec<u8>, len: usize) -> (Option<usize>, Option<usize>) {
