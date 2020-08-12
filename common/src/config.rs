@@ -45,6 +45,6 @@ pub const MAX_HAVOC_FLIP_TIMES: usize = 45; // for all bytes
 pub const MAX_SPLICE_TIMES: usize = 45;
 
 // AFL Program Option Mutation
-pub const MUTATE_PROGRAM_OPT_CHANCE: f64 = 1.0; // 1.0 means always mutate
+pub const MUTATE_PROGRAM_OPT_CHANCE: f64 = 0.2; // 1.0 means always mutate
 pub const MUTATE_PROGRAM_OPT_USING_GRAMMAR: bool = true;
 pub const GRAMMAR_BASED_MAX_PROG_OPTS: usize = 5;

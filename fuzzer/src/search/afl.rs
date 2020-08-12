@@ -110,14 +110,11 @@ impl<'a> AFLFuzz<'a> {
         let program_opts = &self.program_opts;
         let program_opts_dict = &self.handler.executor.cmd.option_vec;
 
-        let po_sample_size = rng.gen_range(0, program_opts.len());
-        let po_sample = program_opts.iter().choose_multiple(&mut rng, po_sample_size);
-
         let dict_sample_size = rng.gen_range(0, program_opts_dict.len());
         let dict_sample = program_opts_dict.iter().choose_multiple(&mut rng, dict_sample_size);
 
         let mut deduplicate_set = HashSet::new();
-        for i in po_sample {
+        for i in program_opts {
             deduplicate_set.insert(i);
         }
         for i in dict_sample {
