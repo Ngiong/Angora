@@ -28,6 +28,7 @@ pub fn fuzz_main(
 ) {
     pretty_env_logger::init();
     let option_vec = parse_program_option_file(program_option_file);
+    let init_program_opts = parse_init_program_opts(&pargs);
 
     let (seeds_dir, angora_out_dir) = initialize_directories(in_dir, out_dir, sync_afl);
     let command_option = command::CommandOpt::new(
@@ -41,6 +42,7 @@ pub fn fuzz_main(
         enable_afl,
         enable_exploitation,
         option_vec,
+        init_program_opts,
     );
     info!("{:?}", command_option);
 
@@ -281,4 +283,15 @@ fn parse_program_option_file(file: Option<&str>) -> Vec<String> {
         }
     }
     options
+}
+
+fn parse_init_program_opts(pargs: &Vec<String>) -> Vec<String> {
+    let mut tmp_args = pargs.clone();
+    let mut tmp_args: Vec<String> = tmp_args.iter()
+        .filter(|&s| s.ne("@@"))
+        .cloned()
+        .collect();
+    let result: Vec<String> = tmp_args.drain(1..).collect();
+    result
+
 }

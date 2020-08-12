@@ -28,7 +28,11 @@ impl InstrumentationMode {
     }
 
     pub fn is_pin_mode(&self) -> bool {
-        self == &InstrumentationMode::Pin
+        let result = self == &InstrumentationMode::Pin;
+        if result {
+            panic!("Unsupported for fuzzing program option purpose!");
+        }
+        result
     }
 }
 
@@ -52,6 +56,7 @@ pub struct CommandOpt {
     pub enable_afl: bool,
     pub enable_exploitation: bool,
     pub option_vec: Vec<String>,
+    pub init_program_opts: Vec<String>,
 }
 
 impl CommandOpt {
@@ -66,6 +71,7 @@ impl CommandOpt {
         enable_afl: bool,
         enable_exploitation: bool,
         option_vec: Vec<String>,
+        init_program_opts: Vec<String>,
     ) -> Self {
         let mode = InstrumentationMode::from(mode);
         
@@ -97,12 +103,8 @@ impl CommandOpt {
         );
 
         let mut tmp_args = pargs.clone();
-        let mut tmp_args: Vec<String> = tmp_args.iter()
-            .filter(|&s| s.ne("@@"))
-            .cloned()
-            .collect();
         let main_bin = tmp_args[0].clone();
-        let main_args: Vec<String> = tmp_args.drain(1..).collect();
+        let main_args: Vec<String> = vec![String::from("@@")]; // note: for fuzzing program opts purpose
         let uses_asan = check_dep::check_asan(&main_bin);
         if uses_asan && mem_limit != 0 {
             warn!("The program compiled with ASAN, set MEM_LIMIT to 0 (unlimited)");
@@ -154,6 +156,7 @@ impl CommandOpt {
             enable_afl,
             enable_exploitation,
             option_vec,
+            init_program_opts,
         }
     }
 
