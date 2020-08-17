@@ -91,11 +91,13 @@ impl<'a> AFLFuzz<'a> {
 
         } else { // byte mutation
             let mut program_opts_bytes: Vec<u8> = program_opts.join(" ").into_bytes();
+            if program_opts_bytes.is_empty() {
+                program_opts_bytes = Vec::from(" ");
+            }
             self.havoc_flip(&mut program_opts_bytes, max_stacking, choice_range);
             match String::from_utf8(program_opts_bytes) {
                 Ok(str) => vec![str],
                 Err(_) => {
-                    warn!("Unable to parse program options after AFL mutation (afl::random_program_opts_mutation)");
                     program_opts.clone()
                 },
             }
