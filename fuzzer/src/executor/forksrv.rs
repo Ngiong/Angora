@@ -11,7 +11,7 @@ use std::{
         net::{UnixListener, UnixStream},
     },
     path::Path,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     time::Duration,
 };
 
@@ -24,6 +24,7 @@ pub struct Forksrv {
     pub socket: UnixStream,
     uses_asan: bool,
     is_stdin: bool,
+    pub child : Child,
 }
 
 impl Forksrv {
@@ -49,7 +50,7 @@ impl Forksrv {
         let mut envs_fk = envs.clone();
         envs_fk.insert(ENABLE_FORKSRV.to_string(), String::from("TRUE"));
         envs_fk.insert(FORKSRV_SOCKET_PATH_VAR.to_string(), socket_path.to_owned());
-        match Command::new(&target.0)
+        let child = match Command::new(&target.0)
             .args(&target.1)
             .stdin(Stdio::null())
             .envs(&envs_fk)
@@ -60,7 +61,7 @@ impl Forksrv {
             .pipe_stdin(fd, is_stdin)
             .spawn()
         {
-            Ok(_) => (),
+            Ok(c) => (c),
             Err(e) => {
                 error!("FATAL: Failed to spawn child. Reason: {}", e);
                 panic!();
@@ -90,6 +91,7 @@ impl Forksrv {
             socket,
             uses_asan,
             is_stdin,
+            child
         }
     }
 

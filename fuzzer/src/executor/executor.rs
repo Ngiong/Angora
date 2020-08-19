@@ -101,6 +101,16 @@ impl Executor {
     pub fn rebind_forksrv(&mut self) {
         {
             // delete the old forksrv
+            warn!("rebinding forksrv");
+            if let Some(forksrv) = &mut self.forksrv {
+                match forksrv.child.try_wait() {
+                    Ok(_) => {},
+                    Err(e) => {
+                        if let Ok(_) = forksrv.child.kill() {};
+                        warn!("Tried to wait, but child does not exited, sent SIGKILL. : {:?}", e);
+                    }
+                }
+            }
             self.forksrv = None;
         }
         let fs = forksrv::Forksrv::new(
