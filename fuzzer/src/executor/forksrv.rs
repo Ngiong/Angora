@@ -5,7 +5,7 @@ use libc;
 use std::{
     collections::HashMap,
     fs,
-    io::prelude::*,
+    io::{prelude::*, ErrorKind},
     os::unix::{
         io::RawFd,
         net::{UnixListener, UnixStream},
@@ -94,68 +94,82 @@ impl Forksrv {
     }
 
     pub fn run(&mut self) -> StatusType {
-        if self.socket.write(&FORKSRV_NEW_CHILD).is_err() {
-            warn!("Fail to write socket!!");
-            return StatusType::Error;
+        loop {
+            match self.socket.write(&FORKSRV_NEW_CHILD) {
+                Ok(_) => { break; }
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => { continue; } ,
+                Err(e) => {
+                    warn!("Fail to write socket!! : {:?}, path : {}", e, self.path);
+                    return StatusType::Error;
+                }
+            }
         }
 
         let mut buf = vec![0; 4];
         let child_pid: i32;
-        match self.socket.read(&mut buf) {
-            Ok(_) => {
-                child_pid = match (&buf[..]).read_i32::<LittleEndian>() {
-                    Ok(a) => a,
-                    Err(e) => {
-                        warn!("Unable to recover child pid: {:?}", e);
+
+        loop {
+            match self.socket.read(&mut buf) {
+                Ok(_) => {
+                    child_pid = match (&buf[..]).read_i32::<LittleEndian>() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            warn!("Unable to recover child pid: {:?}", e);
+                            return StatusType::Error;
+                        }
+                    };
+                    if child_pid <= 0 {
+                        warn!(
+                            "Unable to request new process from frok server! {}",
+                            child_pid
+                        );
                         return StatusType::Error;
                     }
-                };
-                if child_pid <= 0 {
-                    warn!(
-                        "Unable to request new process from frok server! {}",
-                        child_pid
-                    );
+                    break;
+                },
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => { continue; },
+                Err(error) => {
+                    warn!("Fail to read child_id -- {}", error);
                     return StatusType::Error;
                 }
-            }
-            Err(error) => {
-                warn!("Fail to read child_id -- {}", error);
-                return StatusType::Error;
             }
         }
 
         buf = vec![0; 4];
 
-        let read_result = self.socket.read(&mut buf);
-
-        match read_result {
-            Ok(_) => {
-                let status = match (&buf[..]).read_i32::<LittleEndian>() {
-                    Ok(a) => a,
-                    Err(e) => {
-                        warn!("Unable to recover result from child: {}", e);
-                        return StatusType::Error;
+        let mut try_time = 0;
+        loop {
+            match self.socket.read(&mut buf) {
+                Ok(_) => {
+                    let status = match (&buf[..]).read_i32::<LittleEndian>() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            warn!("Unable to recover result from child: {}", e);
+                            return StatusType::Error;
+                        }
+                    };
+                    let exit_code = unsafe { libc::WEXITSTATUS(status) };
+                    let signaled = unsafe { libc::WIFSIGNALED(status) };
+                    if signaled || (self.uses_asan && exit_code == MSAN_ERROR_CODE) {
+                        debug!("Crash code: {}", status);
+                        return StatusType::Crash;
+                    } else {
+                        return StatusType::Normal;
                     }
-                };
-                let exit_code = unsafe { libc::WEXITSTATUS(status) };
-                let signaled = unsafe { libc::WIFSIGNALED(status) };
-                if signaled || (self.uses_asan && exit_code == MSAN_ERROR_CODE) {
-                    debug!("Crash code: {}", status);
-                    StatusType::Crash
-                } else {
-                    StatusType::Normal
+                },
+                Err(ref e) if e.kind() == ErrorKind::Interrupted && try_time <= 5 => {
+                    try_time += 1; continue;
+                },
+                Err(_) => {
+                    unsafe {
+                        libc::kill(child_pid, libc::SIGKILL);
+                    }
+                    let tmout_buf = &mut [0u8; 16];
+                    while let Err(_) = self.socket.read(tmout_buf) {
+                        warn!("Killing timed out process");
+                    }
+                    return StatusType::Timeout;
                 }
-            }
-
-            Err(_) => {
-                unsafe {
-                    libc::kill(child_pid, libc::SIGKILL);
-                }
-                let tmout_buf = &mut [0u8; 16];
-                while let Err(_) = self.socket.read(tmout_buf) {
-                    warn!("Killing timed out process");
-                }
-                return StatusType::Timeout;
             }
         }
     }
