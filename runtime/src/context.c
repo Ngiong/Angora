@@ -142,6 +142,17 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  new_argv[new_argc++] = new_name;
+  int has_input_file = 0;
+  for (i = 0; i < new_argc; i++) {
+    if (strcmp(new_argv[i], "@@") == 0) {
+      has_input_file = 1;
+      new_argv[i] = new_name;
+    }
+  }
+
+  if (!has_input_file) {
+    new_argv[new_argc++] = new_name;
+  }
+
   return __print_argc_argv(new_argc, new_argv);
 }
