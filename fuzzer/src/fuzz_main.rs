@@ -280,9 +280,7 @@ fn parse_program_option_file(file: Option<&str>) -> Vec<String> {
             Ok(mut line) => {
                 if line.len() != 0 {
                     line.retain(|c| c != '\n');
-                    if line.ne("@@") {
-                        options.push(line);
-                    }
+                    options.push(line);
                 }
             },
             _ => {break; }
@@ -293,10 +291,6 @@ fn parse_program_option_file(file: Option<&str>) -> Vec<String> {
 
 fn parse_init_program_opts(pargs: &Vec<String>) -> Vec<String> {
     let mut tmp_args = pargs.clone();
-    let mut tmp_args: Vec<String> = tmp_args.iter()
-        .filter(|&s| s.ne("@@"))
-        .cloned()
-        .collect();
     let result: Vec<String> = tmp_args.drain(1..).collect();
     result
 
