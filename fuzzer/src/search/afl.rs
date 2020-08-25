@@ -51,8 +51,8 @@ impl<'a> AFLFuzz<'a> {
         } else {
             256
         };
-        let max_choice = if config::ENABLE_MICRO_RANDOM_LEN {
-            8
+        let max_choice = if config::ENABLE_MICRO_RANDOM_LEN_AND_PROGRAM_OPT_HAVOC_MUTATION {
+            8 + 2 + if config::MUTATE_PROGRAM_OPT_ALLOW_DELETE { 1 } else { 0 }
         } else {
             6
         };
@@ -69,8 +69,9 @@ impl<'a> AFLFuzz<'a> {
             let mut buf = self.handler.buf.clone();
             self.havoc_flip(&mut buf, max_stacking, choice_range);
 
-            let mutated_program_opts = self.mutate_prog_opt(max_stacking, choice_range);
-            self.handler.execute(&buf, &mutated_program_opts);
+            // let mutated_program_opts = self.mutate_prog_opt(max_stacking, choice_range);
+            // self.handler.execute(&buf, &mutated_program_opts);
+            self.handler.execute(&buf, &self.program_opts);
         }
     }
 
@@ -80,14 +81,14 @@ impl<'a> AFLFuzz<'a> {
         choice_range: Uniform<u32>
     ) -> Vec<String> {
         let mut rng = rand::thread_rng();
-        let program_opts = &self.program_opts;
+        let program_opts = self.program_opts.clone();
         let should_mutate = rng.gen_bool(config::MUTATE_PROGRAM_OPT_CHANCE);
         if !should_mutate {
-            return program_opts.clone();
+            return program_opts;
         }
 
-        let result = if config::MUTATE_PROGRAM_OPT_USING_GRAMMAR { // grammar-based mutation
-            self.grammar_based_program_opt_mutation()
+        let result = if config::CH_MUTATE_PROGRAM_OPT_USING_DICT { // grammar-based mutation
+            self.dict_based_program_opt_mutation()
 
         } else { // byte mutation
             let mut program_opts_bytes: Vec<u8> = program_opts.join(" ").into_bytes();
@@ -98,14 +99,14 @@ impl<'a> AFLFuzz<'a> {
             match String::from_utf8(program_opts_bytes) {
                 Ok(str) => vec![str],
                 Err(_) => {
-                    program_opts.clone()
+                    program_opts
                 },
             }
         };
         result
     }
 
-    fn grammar_based_program_opt_mutation(
+    fn dict_based_program_opt_mutation(
         &mut self,
     ) -> Vec<String> {
         let mut rng = rand::thread_rng();
@@ -123,7 +124,7 @@ impl<'a> AFLFuzz<'a> {
             deduplicate_set.insert(i);
         }
 
-        let final_program_opt_size = rng.gen_range(0, config::GRAMMAR_BASED_MAX_PROG_OPTS);
+        let final_program_opt_size = rng.gen_range(0, config::CH_DICT_BASED_MAX_PROG_OPTS);
         let final_program_opt = deduplicate_set.iter().choose_multiple(&mut rng, final_program_opt_size);
         let mut final_program_opt: Vec<String> = final_program_opt.iter()
             .map(|&&s| s.clone())
@@ -180,7 +181,7 @@ impl<'a> AFLFuzz<'a> {
     }
 
     // TODO both endian?
-    fn havoc_flip(&self, buf: &mut Vec<u8>, max_stacking: usize, choice_range: Uniform<u32>) {
+    fn havoc_flip(&mut self, buf: &mut Vec<u8>, max_stacking: usize, choice_range: Uniform<u32>) {
         let mut rng = rand::thread_rng();
         let mut byte_len = buf.len() as u32;
         let use_stacking = 1 + rng.gen_range(0, max_stacking);
@@ -252,6 +253,43 @@ impl<'a> AFLFuzz<'a> {
                         }
                     }
                 },
+                8 => {
+                    // overwrite program option
+                    let program_opts_dict = &self.handler.executor.cmd.option_vec;
+
+                    let new_po_idx = rng.gen_range(0, program_opts_dict.len());
+                    let new_opt = program_opts_dict[new_po_idx].clone();
+
+                    if self.program_opts.is_empty() { // do insert
+                        self.program_opts.push(new_opt);
+                    } else {
+                        let loc_idx = rng.gen_range(0, self.program_opts.len());
+                        self.program_opts[loc_idx] = new_opt;
+                    }
+                },
+                9 => {
+                    // insert program option
+                    let program_opts_dict = &self.handler.executor.cmd.option_vec;
+
+                    let new_po_idx = rng.gen_range(0, program_opts_dict.len());
+                    let new_opt = program_opts_dict[new_po_idx].clone();
+
+                    if self.program_opts.is_empty() {
+                        self.program_opts.push(new_opt);
+                    } else {
+                        let loc_idx = rng.gen_range(0, self.program_opts.len() + 1);
+                        self.program_opts.insert(loc_idx, new_opt);
+                    }
+                },
+                10 => {
+                    // delete program option
+                    if self.program_opts.is_empty() {
+                        // do nothing
+                    } else {
+                        let loc_idx = rng.gen_range(0, self.program_opts.len());
+                        self.program_opts.remove(loc_idx);
+                    }
+                }
                 _ => {},
             }
         }

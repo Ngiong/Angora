@@ -259,8 +259,14 @@ fn main_thread_sync_and_log(
 }
 
 fn parse_program_option_file(file: Option<&str>) -> Vec<String> {
-    if file.is_none() && config::MUTATE_PROGRAM_OPT_USING_GRAMMAR {
-        panic!("You must provide the option file (-O <file>) to use Grammar-based program options fuzzing");
+    if file.is_none() && config::CH_MUTATE_PROGRAM_OPT_USING_DICT {
+        panic!("You must provide the option file (-O <file>) to use dictionary-based program options fuzzing");
+    }
+    if file.is_none() && config::ENABLE_MICRO_RANDOM_LEN_AND_PROGRAM_OPT_HAVOC_MUTATION {
+        panic!("You must provide the option file (-O <file>) to use AFL program opt havoc mutation");
+    }
+    if file.is_none() {
+        panic!("You must provide the option file (-O <file>) to use Angora from this branch");
     }
 
     if file.is_none() {

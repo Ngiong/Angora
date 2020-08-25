@@ -2,7 +2,7 @@
 // length
 pub const ENABLE_INPUT_LEN_EXPLORATION: bool = true;
 pub const ENABLE_RANDOM_LEN: bool = false;
-pub const ENABLE_MICRO_RANDOM_LEN: bool = true;
+pub const ENABLE_MICRO_RANDOM_LEN_AND_PROGRAM_OPT_HAVOC_MUTATION: bool = true;
 
 // other
 pub const DISABLE_INFER_SHAPE_IF_HAS_AND_OP: bool = true;
@@ -44,7 +44,11 @@ pub const RANDOM_LEN_NUM: usize = 30;
 pub const MAX_HAVOC_FLIP_TIMES: usize = 45; // for all bytes
 pub const MAX_SPLICE_TIMES: usize = 45;
 
-// AFL Program Option Mutation
+// Chance-based Program Option Mutation
 pub const MUTATE_PROGRAM_OPT_CHANCE: f64 = 0.2; // 1.0 means always mutate
-pub const MUTATE_PROGRAM_OPT_USING_GRAMMAR: bool = true;
-pub const GRAMMAR_BASED_MAX_PROG_OPTS: usize = 4;
+pub const CH_MUTATE_PROGRAM_OPT_USING_DICT: bool = true;
+pub const CH_DICT_BASED_MAX_PROG_OPTS: usize = 4;
+
+// AFL Dictionary-based Deterministic Program Option Mutation
+pub const MUTATE_PROGRAM_OPT_DETERMINISTIC: bool = true;
+pub const MUTATE_PROGRAM_OPT_ALLOW_DELETE: bool = true;
