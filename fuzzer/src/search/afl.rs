@@ -51,8 +51,15 @@ impl<'a> AFLFuzz<'a> {
         } else {
             256
         };
+
+        let program_option_additional_choice = if config::MUTATE_PROGRAM_OPT_HAVOC {
+            2 + if config::MUTATE_PROGRAM_OPT_ALLOW_DELETE { 1 } else { 0 }
+        } else {
+            0
+        };
+
         let max_choice = if config::ENABLE_MICRO_RANDOM_LEN_AND_PROGRAM_OPT_HAVOC_MUTATION {
-            8 + 2 + if config::MUTATE_PROGRAM_OPT_ALLOW_DELETE { 1 } else { 0 }
+            8 + program_option_additional_choice
         } else {
             6
         };

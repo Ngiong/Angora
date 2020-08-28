@@ -51,4 +51,5 @@ pub const CH_DICT_BASED_MAX_PROG_OPTS: usize = 4;
 
 // AFL Dictionary-based Deterministic Program Option Mutation
 pub const MUTATE_PROGRAM_OPT_DETERMINISTIC: bool = true;
+pub const MUTATE_PROGRAM_OPT_HAVOC: bool = true;
 pub const MUTATE_PROGRAM_OPT_ALLOW_DELETE: bool = true;
