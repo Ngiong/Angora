@@ -78,8 +78,33 @@ impl<'a> AFLFuzz<'a> {
 
             // let mutated_program_opts = self.mutate_prog_opt(max_stacking, choice_range);
             // self.handler.execute(&buf, &mutated_program_opts);
+
+            // before execute, remove program option redundancy
+            self.program_opt_redundancy_removal();
             self.handler.execute(&buf, &self.program_opts);
         }
+    }
+
+    fn program_opt_redundancy_removal(&mut self) {
+        if config::MUTATE_PROGRAM_OPT_ALLOW_DUPLICATE {
+            return;
+        }
+
+        let mut po_buf = Vec::new();
+        let mut uniq = HashSet::new();
+        for i in &self.program_opts {
+            if i.starts_with('-') {
+                if uniq.contains(i) {
+                    // do nothing
+                } else {
+                    uniq.insert(i.clone());
+                    po_buf.push(i.clone());
+                }
+            } else {
+                po_buf.push(i.clone());
+            }
+        }
+        self.program_opts = po_buf;
     }
 
     fn mutate_prog_opt(

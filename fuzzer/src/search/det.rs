@@ -1,5 +1,6 @@
 use super::*;
 use std::cmp;
+use std::collections::HashSet;
 
 pub struct DetFuzz<'a> {
     handler: SearchHandler<'a>,
@@ -40,6 +41,23 @@ impl<'a> DetFuzz<'a> {
         }
     }
 
+    fn allow_duplicate_or_no_duplicate_program_opt(&self, po_buf: &Vec<String>) -> bool {
+        if config::MUTATE_PROGRAM_OPT_ALLOW_DUPLICATE {
+            return true;
+        }
+        let mut uniq = HashSet::new();
+        for i in po_buf {
+            if i.starts_with('-') {
+                if uniq.contains(i) {
+                    return false;
+                } else {
+                    uniq.insert(i);
+                }
+            }
+        }
+        true
+    }
+
     pub fn deterministic_overwrite_program_opts(&mut self, po_dict: &Vec<String>) {
         let mut input = self.handler.get_f_input();
 
@@ -49,7 +67,10 @@ impl<'a> DetFuzz<'a> {
             let tmp = po_buf[i].clone();
             for new_opt in po_dict {
                 po_buf[i] = new_opt.clone();
-                self.handler.execute_cond(&input, &po_buf);
+                let execute = self.allow_duplicate_or_no_duplicate_program_opt(&po_buf);
+                if execute {
+                    self.handler.execute_cond(&input, &po_buf);
+                }
             }
             po_buf[i] = tmp;
         }
@@ -67,7 +88,10 @@ impl<'a> DetFuzz<'a> {
         for i in 0..po_buf_len {
             for new_opt in po_dict {
                 po_buf[i] = new_opt.clone();
-                self.handler.execute_cond(&input, &po_buf);
+                let execute = self.allow_duplicate_or_no_duplicate_program_opt(&po_buf);
+                if execute {
+                    self.handler.execute_cond(&input, &po_buf);
+                }
             }
             if i < po_buf_len - 1 {
                 po_buf[i] = po_buf[i+1].clone();
